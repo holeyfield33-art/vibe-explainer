@@ -126,18 +126,25 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("## AI Data Flows")
     add("")
     if report.data_flows:
-        add("Observed same-file relationships between AI components. These are static "
-            "inferences from code proximity, not confirmed runtime data flows.")
+        add("Observed relationships between AI components. These are static inferences "
+            "from code proximity (same-file) and resolved imports (cross-file) — not "
+            "confirmed runtime data flows. The Method column records how each edge was "
+            "resolved; cross-file (IMPORT) edges are bounded inference from import "
+            "resolution, never proven flow.")
         add("")
-        add("| Source | Relationship | Destination | Confidence | Location |")
-        add("|---|---|---|---|---|")
+        add("| Source | Relationship | Destination | Method | Confidence | Location |")
+        add("|---|---|---|---|---|---|")
         for e in report.data_flows:
+            method = e.get("resolution_method", "SAME_FILE")
+            if method == "IMPORT":
+                loc = f"`{e.get('source_file', e['file'])}` → `{e.get('destination_file', e['file'])}`"
+            else:
+                loc = f"`{e['file']}:{e['source_line']}→{e['destination_line']}`"
             add(f"| {e['source']} | `{e['relationship']}` | {e['destination']} | "
-                f"{e['confidence']} | `{e['file']}:{e['source_line']}→{e['destination_line']}` |")
+                f"{method} | {e['confidence']} | {loc} |")
         add("")
     else:
-        add("No AI data-flow relationships were observed. Note that cross-file flows are not "
-            "established by this assessment even when implied by imports.")
+        add("No AI data-flow relationships were observed.")
         add("")
     add("---")
     add("")

@@ -191,5 +191,60 @@ class TestReportContextIntegration(unittest.TestCase):
             self.assertLess(es["production_findings"], es["total_findings"])
 
 
+class TestCrossFileDataFlow(unittest.TestCase):
+    """Phase 8G/8H: bounded cross-file edges via resolved imports, and the
+    negative guard that unrelated files never connect."""
+
+    def _graph(self, files: dict[str, str]):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            for rel, content in files.items():
+                _write(root, rel, content)
+            disc = discover_ai(root)
+            return build_dataflow(disc)
+
+    def test_cross_file_prompt_to_model_edge(self):
+        g = self._graph({
+            "routes.py": "from services.ai import generate\nSYSTEM_PROMPT = 'x'\ng = generate(SYSTEM_PROMPT)\n",
+            "services/ai.py": "from openai import OpenAI\nc = OpenAI()\n"
+                              "def generate(p):\n    return c.chat.completions.create(model='gpt-4o', messages=[{'role':'user','content':p}])\n",
+        })
+        xf = [e for e in g.edges if e.resolution_method == "IMPORT"]
+        self.assertTrue(xf)
+        e = xf[0]
+        self.assertEqual(e.source_file, "routes.py")
+        self.assertEqual(e.destination_file, "services/ai.py")
+        # bounded inference is never HIGH confidence
+        self.assertNotEqual(e.confidence, "high")
+
+    def test_unrelated_files_do_not_connect(self):
+        g = self._graph({
+            "alpha.py": "SYSTEM_PROMPT = 'x'\n",  # prompt, no import
+            "beta.py": "from openai import OpenAI\nc=OpenAI()\nc.chat.completions.create(model='g', messages=[])\n",
+        })
+        xf = [e for e in g.edges if e.resolution_method == "IMPORT"]
+        self.assertEqual(xf, [])
+
+    def test_external_import_creates_no_cross_file_edge(self):
+        # importing openai (external) must not create a cross-file edge to anything
+        g = self._graph({
+            "app.py": "import openai\nSYSTEM_PROMPT='x'\n",
+        })
+        xf = [e for e in g.edges if e.resolution_method == "IMPORT"]
+        self.assertEqual(xf, [])
+
+    def test_cross_file_edge_carries_resolution_method(self):
+        g = self._graph({
+            "main.py": "from lib.model import run\nSYSTEM_PROMPT='x'\nrun(SYSTEM_PROMPT)\n",
+            "lib/model.py": "from openai import OpenAI\nc=OpenAI()\ndef run(p):\n    return c.chat.completions.create(model='g', messages=[{'role':'user','content':p}])\n",
+        })
+        for e in g.edges:
+            self.assertIn(e.resolution_method, ("SAME_FILE", "IMPORT"))
+            d = e.to_dict()
+            self.assertIn("resolution_method", d)
+            self.assertIn("source_file", d)
+            self.assertIn("destination_file", d)
+
+
 if __name__ == "__main__":
     unittest.main()

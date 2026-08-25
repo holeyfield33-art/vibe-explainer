@@ -216,6 +216,9 @@ def build_report(
             "file": e.file,
             "source_line": e.source_line,
             "destination_line": e.destination_line,
+            "resolution_method": getattr(e, "resolution_method", "SAME_FILE"),
+            "source_file": getattr(e, "source_file", "") or e.file,
+            "destination_file": getattr(e, "destination_file", "") or e.file,
             "evidence": _redact_check(e.evidence),
         }
         for e in dataflow.edges

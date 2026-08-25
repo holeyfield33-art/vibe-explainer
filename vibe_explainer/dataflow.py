@@ -118,6 +118,9 @@ class DataFlowObservation:
     confidence: str
     evidence: str
     status: str = STATUS_INFERRED
+    resolution_method: str = "SAME_FILE"  # Phase 8G: SAME_FILE | IMPORT
+    source_file: str = ""  # populated for cross-file edges
+    destination_file: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -132,6 +135,9 @@ class DataFlowObservation:
             "confidence": self.confidence,
             "evidence": self.evidence,
             "status": self.status,
+            "resolution_method": self.resolution_method,
+            "source_file": self.source_file or self.file,
+            "destination_file": self.destination_file or self.file,
         }
 
 
@@ -235,6 +241,57 @@ def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
                         confidence=confidence,
                         evidence=evidence,
                         status=STATUS_INFERRED,
+                    )
+                )
+
+    # ---- Phase 8G: bounded cross-file edges via resolved imports ----------
+    # When file A imports file B (resolved via the AST/regex symbol index) and a
+    # source-category finding in A pairs with a destination-category finding in B,
+    # emit a cross-file edge. This is BOUNDED STATIC INFERENCE, not proven data
+    # flow: an import establishes that A can reach B's symbols, not that data
+    # actually flows along this specific pair. Confidence is therefore capped at
+    # moderate (never high) for import-resolved edges, per the resolution model.
+    imports_by_file = getattr(discovery, "imports_by_file", {}) or {}
+    by_file_cat_only: dict[tuple[str, str], list[AIFinding]] = by_file_category
+    for source_cat, dest_cat in _RULE_PAIRS:
+        for importer, imported_files in imports_by_file.items():
+            source_candidates = by_file_cat_only.get((importer, source_cat), [])
+            if not source_candidates:
+                continue
+            for imported in imported_files:
+                dest_findings = by_file_cat_only.get((imported, dest_cat), [])
+                if not dest_findings:
+                    continue
+                # deterministic representative pick: lowest-line finding on each side
+                src = min(source_candidates, key=lambda f: (f.line, f.id))
+                dest = min(dest_findings, key=lambda f: (f.line, f.id))
+                relationship = _relationship_name(src, dest)
+                edge_key = (src.id, dest.id, relationship)
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                evidence = (
+                    f"{importer} imports {imported}; {src.category}:{src.name} in the "
+                    f"importer pairs with {dest.category}:{dest.name} in the imported "
+                    f"module. Bounded static inference from import resolution — not a "
+                    f"proven runtime data flow."
+                )
+                edges.append(
+                    DataFlowObservation(
+                        source_finding_id=src.id,
+                        destination_finding_id=dest.id,
+                        source_type=src.category,
+                        destination_type=dest.category,
+                        relationship=relationship,
+                        file=importer,
+                        source_line=src.line,
+                        destination_line=dest.line,
+                        confidence="moderate",
+                        evidence=evidence,
+                        status=STATUS_INFERRED,
+                        resolution_method="IMPORT",
+                        source_file=importer,
+                        destination_file=imported,
                     )
                 )
 

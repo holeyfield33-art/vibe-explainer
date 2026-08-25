@@ -114,6 +114,10 @@ class DiscoveryResult:
     findings: list[AIFinding] = field(default_factory=list)
     files_scanned: int = 0
     truncated: list[TruncatedGroup] = field(default_factory=list)
+    # Phase 8G: file -> list of repo-relative files it imports (resolved via AST/
+    # regex import resolution). Only repo-internal imports appear here; external
+    # packages are excluded. Used to build cross-file dataflow edges.
+    imports_by_file: dict[str, list[str]] = field(default_factory=dict)
 
     def by_category(self) -> dict[str, list[AIFinding]]:
         out: dict[str, list[AIFinding]] = {}
@@ -265,6 +269,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
     index_by_id: dict[str, int] = {}
     truncated_ids: set[str] = set()  # (file,line,category,name) identities already counted as truncated
     _CONFIDENCE_PRIORITY = {"high": 3, "moderate": 2, "low": 1}
+    file_texts: dict[str, str] = {}  # rel -> content, for Phase 8G import resolution
 
     for file_path in _iter_candidate_files(root_path):
         text = _read_text(file_path)
@@ -272,6 +277,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
             continue
         result.files_scanned += 1
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+        file_texts[rel] = text
         # Classify the file's context once (content-aware), reused for every
         # finding in this file. (Phase 8D)
         file_ctx = classify_file(rel, content=text)
@@ -351,7 +357,37 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                     )
                 )
 
+    # Phase 8G: resolve repo-internal imports once, for cross-file dataflow.
+    result.imports_by_file = _resolve_internal_imports(file_texts)
+
     return result
+
+
+def _resolve_internal_imports(file_texts: dict[str, str]) -> dict[str, list[str]]:
+    """Build file -> [resolved repo-internal imported files] using the AST/regex
+    symbol index. Only files that actually contain AI findings matter downstream,
+    but resolving for all scanned files keeps this independent of finding order.
+    External packages resolve to None and are omitted."""
+    from .symbol_index import build_symbol_index, resolve_js_import, resolve_python_import
+
+    pairs = list(file_texts.items())
+    index = build_symbol_index(pairs)
+    out: dict[str, list[str]] = {}
+    for rel, _text in pairs:
+        info = index.modules.get(rel)
+        if info is None:
+            continue
+        resolved: list[str] = []
+        for target in info.imports:
+            if info.language == "python":
+                hit = resolve_python_import(rel, target, index)
+            else:
+                hit = resolve_js_import(rel, target, index)
+            if hit and hit != rel:
+                resolved.append(hit)
+        if resolved:
+            out[rel] = sorted(set(resolved))
+    return out
 
 
 # Pattern names most prone to string-literal / comment false positives (a security
