@@ -50,6 +50,21 @@ def _redact_check(text: str) -> str:
     return _redact(text)
 
 
+def _repo_name(root: str) -> str:
+    """Extract a display name (the project's directory name) from a repository root
+    path, handling both POSIX and Windows separators and trailing slashes. Falls back
+    to the raw string if no basename can be derived. This keeps an assessor's local
+    filesystem layout out of the deliverable header."""
+    if not root:
+        return "repository"
+    normalized = root.replace("\\", "/").rstrip("/")
+    # Drop a Windows drive prefix like "C:" if that's somehow all that's left.
+    name = normalized.rsplit("/", 1)[-1]
+    if not name or name.endswith(":"):
+        return normalized or "repository"
+    return name
+
+
 @dataclass
 class VibeExplainerReport:
     metadata: dict[str, Any]
@@ -93,11 +108,18 @@ def build_report(
     """Assemble the full report from already-computed Phase 1-6 results. No new
     scanning, scoring, or classification happens here."""
 
+    # Repository identity: the project name (basename) is what belongs in a
+    # deliverable. The full local path is retained separately for traceability but
+    # is not what a report header should expose — the first real-world run leaked
+    # an assessor's local path (C:\Users\...\aletheia-core) into the report header.
+    repo_name = _repo_name(discovery.root)
+
     metadata = {
         "tool": "vibe-explainer",
         "version": __version__,
         "schema_version": "1.0",
-        "repository": discovery.root,
+        "repository": repo_name,
+        "repository_path": discovery.root,
         "assessment_completeness": readiness.assessment_completeness,
     }
 
