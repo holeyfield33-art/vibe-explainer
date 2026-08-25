@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .scanner import SKIP_DIRS
+from .file_context import classify_file
 
 # Extensions worth content-scanning for AI evidence. Broader than scanner.CODE_EXTS
 # because config/env files are where secrets and MCP transport config tend to live.
@@ -67,6 +68,8 @@ class AIFinding:
     evidence: str
     confidence: Confidence
     id: str = ""
+    context: str = "PRODUCTION"  # file context (Phase 8D): PRODUCTION/TEST/SECURITY_TEST/...
+    context_confidence: str = "moderate"
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -81,6 +84,8 @@ class AIFinding:
             "line": self.line,
             "evidence": self.evidence,
             "confidence": self.confidence,
+            "context": self.context,
+            "context_confidence": self.context_confidence,
         }
 
 
@@ -267,6 +272,9 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
             continue
         result.files_scanned += 1
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+        # Classify the file's context once (content-aware), reused for every
+        # finding in this file. (Phase 8D)
+        file_ctx = classify_file(rel, content=text)
 
         for category, name, pattern, confidence in _PATTERNS:
             for match in pattern.finditer(text):
@@ -338,6 +346,8 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                         line=line_no,
                         evidence=evidence,
                         confidence=effective_confidence,
+                        context=file_ctx.context,
+                        context_confidence=file_ctx.confidence,
                     )
                 )
 

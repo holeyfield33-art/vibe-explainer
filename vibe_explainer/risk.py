@@ -99,6 +99,8 @@ class RiskScenario:
     related_finding_ids: list[str]
     related_dataflow_ids: list[str]
     related_control_ids: list[str]
+    primary_context: str = "PRODUCTION"  # Phase 8E: dominant context of the driving findings
+    context_adjusted: bool = False  # True if severity was capped for non-production context
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -117,6 +119,8 @@ class RiskScenario:
             "related_finding_ids": list(self.related_finding_ids),
             "related_dataflow_ids": list(self.related_dataflow_ids),
             "related_control_ids": list(self.related_control_ids),
+            "primary_context": self.primary_context,
+            "context_adjusted": self.context_adjusted,
         }
 
 
@@ -156,6 +160,32 @@ def _edge_key(e: DataFlowObservation) -> str:
 
 def _best_edge_confidence(edges: list[DataFlowObservation]) -> str:
     return "high" if any(e.confidence == "high" for e in edges) else "moderate"
+
+
+# Phase 8E context-weighting helpers.
+_PRODUCTION_RELEVANT_CONTEXTS = frozenset({"PRODUCTION", "CONFIGURATION", "UNKNOWN"})
+_SEVERITY_BANDS = ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+# Priority for choosing the dominant context of a scenario's findings: production
+# wins if present at all (a single production finding makes the scenario production-
+# relevant), else the most "real" remaining context.
+_CONTEXT_PRIORITY = [
+    "PRODUCTION", "CONFIGURATION", "SECURITY_TEST", "DEMO", "EXAMPLE",
+    "TEST", "FIXTURE", "DOCUMENTATION", "GENERATED", "VENDOR", "UNKNOWN",
+]
+
+
+def _dominant_context(contexts: set[str]) -> str:
+    for ctx in _CONTEXT_PRIORITY:
+        if ctx in contexts:
+            return ctx
+    return "PRODUCTION"
+
+
+def _cap_severity_one_band(severity: str) -> str:
+    if severity in _SEVERITY_BANDS:
+        idx = _SEVERITY_BANDS.index(severity)
+        return _SEVERITY_BANDS[max(0, idx - 1)]
+    return severity
 
 
 def _has_upstream_prompt_chain(ai_usage_id: str, dataflow: DataFlowGraph) -> bool:
@@ -563,6 +593,30 @@ def assess_risks(
                 related_control_ids=["C04"] if c04 else [],
             )
         )
+
+    # ---- Phase 8E: context-aware severity weighting -----------------------
+    # The four-factor score is left intact (it is the framework's fixed formula and
+    # the raw evidence measure). But a scenario driven ENTIRELY by non-production
+    # findings — a risk that only exists in test/example/demo/generated code — should
+    # not carry the same severity as the same pattern in production. We cap such a
+    # scenario's severity by one band and annotate it, rather than silently dropping
+    # it (the evidence is real; its production relevance is what's lower).
+    finding_context = {f.id: f.context for f in discovery.findings}
+    for s in scenarios:
+        contexts = {finding_context.get(fid, "PRODUCTION") for fid in s.related_finding_ids}
+        s.primary_context = _dominant_context(contexts)
+        production_relevant = contexts & _PRODUCTION_RELEVANT_CONTEXTS
+        if not production_relevant and contexts:
+            # entirely non-production: cap severity one band down from the score's band
+            capped = _cap_severity_one_band(s.severity)
+            if capped != s.severity:
+                s.severity = capped
+                s.context_adjusted = True
+                s.rationale += (
+                    f" [Context: this scenario is driven entirely by {s.primary_context} "
+                    "code, not production code; severity has been capped accordingly. The "
+                    "underlying score reflects the pattern as if in production.]"
+                )
 
     scenarios.sort(key=lambda s: s.risk_id)
 
