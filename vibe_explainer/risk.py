@@ -410,7 +410,7 @@ def assess_risks(
         also_feeds_tool = any(e.source_finding_id in {ge.source_finding_id for ge in tool_edges} for e in rag_edges) or any(
             e.destination_finding_id in {ge.source_finding_id for ge in tool_edges} for e in rag_edges
         )
-        exposure = 3 if any(f.name == "Webhook" for f in external_integration) else 2
+        exposure = 3 if any(f.name == "Webhook handler" for f in external_integration) else 2
         safety_impact = 3 if also_feeds_tool else 2
         security_exposure = _security_exposure_from_control(c09, detected=2, partial=3, not_detected=4)
         likelihood = _likelihood_from_control_and_confidence(c09, edge_conf, detected=2, partial=2, not_detected_high=3, not_detected_moderate=2)

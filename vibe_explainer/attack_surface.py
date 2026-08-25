@@ -108,7 +108,7 @@ def _bucket_for(finding: AIFinding) -> str:
     if finding.category == "external_integration":
         # Webhooks are inbound triggers; everything else in this category is
         # an outbound call the app makes, which behaves like a tool.
-        return "inputs" if finding.name == "Webhook" else "tools"
+        return "inputs" if finding.name == "Webhook handler" else "tools"
     return _CATEGORY_BUCKET.get(finding.category, "tools")
 
 

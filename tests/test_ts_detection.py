@@ -59,3 +59,46 @@ class TestNewTSPatternsDoNotOverfire(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEndpointCommentVsLiveCall(unittest.TestCase):
+    """aegis-provenance validation: an endpoint URL in a comment/docstring is a
+    doc reference (low), but the same URL in a live fetch template literal is a
+    real call (high). The comment-only guard must distinguish them."""
+
+    def _findings(self, code: str):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "client.ts"
+            p.write_text(code)
+            return [f for f in discover_ai(d).findings if f.name == "OpenAI-compatible HTTP endpoint"]
+
+    def test_url_in_comment_is_low(self):
+        findings = self._findings("// talks to /chat/completions endpoint\nconst x = 1;\n")
+        self.assertTrue(findings)
+        self.assertTrue(all(f.confidence == "low" for f in findings))
+
+    def test_url_in_live_fetch_is_high(self):
+        findings = self._findings("const r = await fetch(`${base}/chat/completions`, { method: 'POST' });\n")
+        self.assertTrue(findings)
+        self.assertTrue(any(f.confidence == "high" for f in findings))
+
+
+class TestWebhookPrecision(unittest.TestCase):
+    """aegis/firewall validation: the bare-word webhook pattern fired only on
+    fixture names, regex patterns, and corpus descriptions (16 hits, 0 real).
+    The precise handler pattern should match a real handler and skip the noise."""
+
+    def _webhook_names(self, code: str, filename: str = "svc.py"):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / filename).write_text(code)
+            return [f for f in discover_ai(d).findings if "Webhook" in f.name]
+
+    def test_bare_word_webhook_not_matched(self):
+        # a fixture name / description mentioning webhook is not a handler
+        self.assertEqual(self._webhook_names('name = "benign-http-post-status-webhook"\n'), [])
+
+    def test_real_handler_matched(self):
+        findings = self._webhook_names('@app.route("/webhook/incoming", methods=["POST"])\ndef handle_webhook():\n    pass\n')
+        self.assertTrue(findings)

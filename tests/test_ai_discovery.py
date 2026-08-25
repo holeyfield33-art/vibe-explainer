@@ -98,7 +98,7 @@ class TestExternalAPIApp(unittest.TestCase):
         self.assertIn("HTTP client call", _names(self.result.findings, "external_integration"))
 
     def test_detects_webhook(self):
-        self.assertIn("Webhook", _names(self.result.findings, "external_integration"))
+        self.assertIn("Webhook handler", _names(self.result.findings, "external_integration"))
 
     def test_no_model_provider_signal(self):
         # This fixture has no LLM SDK at all — should not falsely claim one.

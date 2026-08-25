@@ -199,7 +199,10 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("mcp", "MCP server config", re.compile(r"\"mcpServers\"|'mcpServers'|mcp_servers\s*[:=]"), "high"),
     # --- EXTERNAL INTEGRATIONS ------------------------------------------
     ("external_integration", "HTTP client call", re.compile(r"\b(?:requests\.(?:get|post|put|delete)|httpx\.(?:get|post|put|delete))\("), "moderate"),
-    ("external_integration", "Webhook", re.compile(r"\bwebhook\b", re.IGNORECASE), "low"),
+    # Webhook: the bare word matched fixture names, regex patterns, and corpus
+    # descriptions across every validation repo (16 hits, 0 real). Require an
+    # actual webhook handler/registration idiom instead of the bare noun.
+    ("external_integration", "Webhook handler", re.compile(r"(?i)\b(?:on_webhook|handle_webhook|webhook_handler|register_webhook|@webhook)\b|\bapp\.(?:post|route)\(['\"][^'\"]*webhook"), "moderate"),
     ("external_integration", "SQL database client", re.compile(r"\b(?:psycopg2|sqlalchemy|pymongo)\b"), "moderate"),
     ("external_integration", "Redis client", re.compile(r"\bredis\.(?:Redis|StrictRedis)\("), "moderate"),
     # --- SECRETS / CONFIGURATION -----------------------------------------
@@ -321,7 +324,9 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                 # live call. Downgrade confidence rather than dropping the finding
                 # (no silent drops), so a security tool's own signature strings
                 # don't read as production code execution.
-                if name in _SIGNATURE_PRONE_NAMES and _match_in_string_or_comment(text, match.start(), line_start):
+                if name in _SIGNATURE_PRONE_NAMES and _match_in_string_or_comment(
+                    text, match.start(), line_start, comment_only=name in _COMMENT_ONLY_GUARD_NAMES
+                ):
                     effective_confidence = "low"
 
                 index_by_id[fid] = len(result.findings)
@@ -340,22 +345,43 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
 
 
 # Pattern names most prone to string-literal / comment false positives (a security
-# tool scanning FOR these tokens will have them as literals/comments in its source).
-_SIGNATURE_PRONE_NAMES = frozenset({"Dynamic code execution", "Shell execution"})
+# tool scanning FOR these tokens, or documenting an endpoint in a docstring, will
+# have them as literals/comments in its source).
+_SIGNATURE_PRONE_NAMES = frozenset({
+    "Dynamic code execution",
+    "Shell execution",
+    "OpenAI-compatible HTTP endpoint",
+    "Whisper transcription endpoint",
+})
 
 
-def _match_in_string_or_comment(text: str, match_start: int, line_start: int) -> bool:
+def _match_in_string_or_comment(text: str, match_start: int, line_start: int, *, comment_only: bool = False) -> bool:
     """Best-effort check: is the match position inside a quoted string or after a
     line-comment marker on its own line? Line-scoped and language-agnostic — not a
-    real parser, deliberately conservative (only flags clear cases)."""
+    real parser, deliberately conservative (only flags clear cases).
+
+    comment_only=True restricts the check to comment/docstring context (leading //,
+    #, or * ) and ignores string-literal heuristics — used for patterns like
+    endpoint URLs that legitimately live inside a template literal passed to fetch()
+    (a live call), where a bare backtick must NOT demote the finding."""
     prefix = text[line_start:match_start]
-    # line comment before the match (# for py/sh, // for js/ts)
-    if "#" in prefix or "//" in prefix:
+    stripped = prefix.lstrip()
+    # comment markers: // (js), # (py/sh), or a leading * (inside a block comment)
+    if "//" in prefix or "#" in prefix or stripped.startswith("*") or stripped.startswith("/*"):
         return True
+    if comment_only:
+        return False
     # odd number of unescaped quotes before the match => inside a string literal
     for q in ("'", '"', "`"):
-        # ignore escaped quotes
         count = len(re.findall(r"(?<!\\)" + re.escape(q), prefix))
         if count % 2 == 1:
             return True
     return False
+
+
+# Patterns where a string-literal is genuinely a live call argument (endpoint URLs in
+# fetch template literals), so only comment/docstring context should demote them.
+_COMMENT_ONLY_GUARD_NAMES = frozenset({
+    "OpenAI-compatible HTTP endpoint",
+    "Whisper transcription endpoint",
+})

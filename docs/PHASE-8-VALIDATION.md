@@ -88,3 +88,48 @@ to help the other. The fix in each case was matched to what the repo actually is
   the dataflow graph, context-aware risk weighting, readiness SECURITY_TEST credit,
   report production/test separation).
 - `MAX_FINDINGS_PER_FILE_PATTERN` tuning decision.
+
+## Repo 3 — aegis-provenance (Aegis Provenance Proxy)
+
+**What it is:** An **LLM-security middleware** — a provenance-enforcing context proxy
+that wraps LLM interactions, marks untrusted content inert, and gates tool calls before
+egress. Pure TypeScript, 88 files. The hardest case so far: it is *about* AI security,
+so its production code legitimately contains injection strings, tool-gating logic, and
+an OpenAI-compatible client (for its own eval mode). Neither "no AI" (repo 1) nor
+"straightforward AI app" (repo 2).
+
+**Baseline (post repo-1/2 fixes):** 35 findings, 29 "production." Mostly the tool's own
+domain vocabulary, not app AI usage.
+
+**Gap classes found:**
+1. *Bare-word `webhook` pattern — pure noise.* Across all three repos it produced 16
+   findings, **0 real** — matching fixture names, an exfiltration-detection regex, and
+   corpus descriptions. **Fixed:** replaced the bare noun with a webhook-*handler*
+   idiom (`@app.route('…/webhook…')`, `handle_webhook`, `register_webhook`, etc.).
+   Result: 16 → 0 noise findings across the three repos, no real finding lost.
+2. *Endpoint URL in comment vs. live call.* The comment guard (added in repo 1) didn't
+   cover the new endpoint-URL patterns, so a docstring mentioning `/chat/completions`
+   read as `high`. Extended the guard to endpoint patterns — but with a `comment_only`
+   refinement, because an endpoint URL inside a **template literal passed to fetch()**
+   is a live call, not a doc reference, and a naive backtick check wrongly demoted it.
+   Now: URL in `//`/`*` comment → `low`; URL in `fetch(\`…/chat/completions\`)` → `high`.
+
+**After:** 35 → 22 findings. The 8 high-signal production findings now point precisely
+at the one real model-calling module (`src/clients/openai-compat.ts`, the actual
+`fetchImpl(\`${baseUrl}/chat/completions\`)` call is `high`) and the eval harness —
+exactly the real AI surface, with comments/imports/fixtures correctly demoted to `low`.
+
+**Verdict:** For an LLM-security middleware, the honest picture is "one real model
+client plus an eval harness, embedded in a lot of security-domain vocabulary." The
+engine now produces that instead of 35 smeared findings.
+
+## Running tally
+
+| Repo | Type | Findings before→after | Bug/gap class |
+|------|------|----------------------|---------------|
+| runtime-firewall-mvp | No-AI security tool (JS) | 56 → 40 | JS `.exec()` FP; signature-string context |
+| creator-ai-hub-v2 | Real AI app (TS) | 6 → 25 | TS raw-fetch AI idioms (false-negative) |
+| aegis-provenance | LLM-security middleware (TS) | 35 → 22 | bare-word webhook noise; comment-vs-live-call |
+
+Three repos, three distinct fix classes, each matched to what the repo actually is. No
+repo's fix damaged another's result — re-verified after each change.
