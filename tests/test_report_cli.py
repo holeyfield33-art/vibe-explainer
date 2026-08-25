@@ -10,7 +10,7 @@ from vibe_explainer.controls import assess_controls
 from vibe_explainer.dataflow import build_dataflow
 from vibe_explainer.readiness import assess_readiness
 from vibe_explainer.risk import assess_risks
-from vibe_explainer.security_report import build_report, render_text
+from vibe_explainer.security_report import build_report, render_text, _repo_name
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -272,6 +272,40 @@ class TestCLI(unittest.TestCase):
     def test_no_secret_leakage_via_cli(self):
         result = self._run(str(FIXTURES / "hardcoded-credential"), "--security", "--json")
         self.assertNotIn("sk-proj-", result.stdout)
+
+
+class TestRepositoryNameNotLeaked(unittest.TestCase):
+    """The first real-world run leaked an assessor's local path
+    (C:\\Users\\SuperAdmin\\.vscode\\aletheia-core) into the report header. The
+    deliverable should show only the project name; the full path lives separately."""
+
+    def test_repo_name_extracts_basename_windows(self):
+        self.assertEqual(_repo_name("C:\\Users\\SuperAdmin\\.vscode\\aletheia-core"), "aletheia-core")
+
+    def test_repo_name_extracts_basename_posix(self):
+        self.assertEqual(_repo_name("/home/user/projects/my-repo"), "my-repo")
+
+    def test_repo_name_handles_trailing_slash(self):
+        self.assertEqual(_repo_name("/home/user/projects/my-repo/"), "my-repo")
+
+    def test_repo_name_empty_fallback(self):
+        self.assertEqual(_repo_name(""), "repository")
+
+    def test_report_metadata_repository_is_basename(self):
+        report = _report("agent-with-tools")
+        # metadata.repository is the clean name; the full path is separate
+        self.assertNotIn("/", report.metadata["repository"])
+        self.assertNotIn("\\", report.metadata["repository"])
+        self.assertIn("repository_path", report.metadata)
+
+    def test_consultant_header_shows_no_absolute_path(self):
+        from vibe_explainer.consultant_report import render_consultant_markdown
+        report = _report("agent-with-tools")
+        md = render_consultant_markdown(report, assessment_date="2026-01-01")
+        # the header line should carry the basename, not a full local path
+        header_region = md.split("## Executive Summary")[0]
+        self.assertNotIn("/home/", header_region)
+        self.assertNotIn("C:\\", header_region)
 
 
 if __name__ == "__main__":
