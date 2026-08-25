@@ -133,3 +133,65 @@ engine now produces that instead of 35 smeared findings.
 
 Three repos, three distinct fix classes, each matched to what the repo actually is. No
 repo's fix damaged another's result — re-verified after each change.
+
+## Repos 4-6 — post-Phase-8 validation
+
+Run with the completed Phase 8 engine (context layer + cross-file resolution active).
+
+### Repo 4 — aletheia-core (THE original benchmark)
+
+This is the repository whose first-run report + red-team review *motivated* Phase 8.
+Re-running the finished engine against it is the real test of whether the flagged gaps
+closed. 459 files (Python + TS), 418 analyzed, 0 silent drops, ~4s.
+
+The original review's central complaint was noise: production code, tests, security
+tests, docs, examples, and demo payloads were indistinguishable. The finished engine
+now reports them separately: **38 production, 35 test, 18 security-test, 6 demo, 5
+config, 2 fixture.**
+
+Every specific item the review called out is now correct:
+- **Production RAG/embeddings the review manually verified as real** — Qdrant in
+  `core/vector_store.py` and the embeddings call at `core/model_loader.py:51` (the exact
+  line the review cited) — surface as `high`-confidence PRODUCTION findings.
+- **The `LiveAletheiaDemoSection` injection payload** the review flagged as a *false*
+  production prompt-injection surface — all 6 demo-file findings now classify as `DEMO`,
+  and there are **0 production `prompt_surface` findings**. The payload is seen but
+  context-demoted, exactly the `Finding → Context → Production/Test/Example` flow the
+  review proposed.
+- **Bare-word webhook noise** ("webhook references all over" but only `WebhookExporter`
+  is real) — 0 spurious webhook findings after the handler-idiom fix.
+- Assessment correctly `PARTIAL` (large repo, real truncation), readiness L1.
+
+Verdict: the repo that motivated Phase 8 now reads the way the reviewer said it should.
+
+### Repo 5 — project-eclipse (marketing says AI, code has none)
+
+18 Python + 9 TSX files. The README markets it as an "AI-powered threat intelligence
+platform," but a full scan finds **zero** AI/LLM signals in the actual code — it's a
+FastAPI + React scaffold with no model integration yet. The engine reports
+`NO_AI_SURFACE` — the honest verdict from code evidence, not the marketing claim. It was
+not fooled by "AI-powered" in the README into fabricating a surface. (Correct zero,
+unlike creator-hub's earlier false-negative where the AI was real but idiom-hidden.)
+
+### Repo 6 — aletheia-portfolio-auditor (small, real cross-file structure)
+
+26 files, dense Python. 24 findings (18 production), 1 LOW risk, **15 dataflow edges of
+which 4 are cross-file**. The cross-file edges are legitimate: `cli.py` (API-key config)
+imports `providers.py` (model provider + AI usage), yielding a real
+`secret_config → model_provider` cross-file edge — a credential-in-one-module flowing to
+model-use-in-another, exactly what same-file-only analysis missed. Assessment `PARTIAL`,
+readiness L1.
+
+## Full tally (6 repos)
+
+| Repo | Type | Result |
+|------|------|--------|
+| runtime-firewall-mvp | no-AI security tool (JS) | 56→40→37; JS exec FP + signature context |
+| creator-ai-hub-v2 | real AI app (TS) | 6→25; recovered TS raw-fetch idioms |
+| aegis-provenance | LLM-security middleware (TS) | 35→22; webhook noise + comment guard |
+| aletheia-core | large mixed AI platform | noise separated: 38 prod / 35 test / 18 sec-test / 6 demo; every review item closed |
+| project-eclipse | no-AI (despite marketing) | NO_AI_SURFACE — honest zero |
+| aletheia-portfolio-auditor | small AI tool | 4 legitimate cross-file edges (secret→model) |
+
+Six repos across five distinct repo types. The two hardest cases — the benchmark that
+motivated the phase, and a repo whose README overclaims AI — both now read honestly.
