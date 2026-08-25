@@ -62,6 +62,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="With --security, emit the full assessment as JSON instead of human-readable text.",
     )
     p.add_argument(
+        "--consultant",
+        action="store_true",
+        help="With --security, emit a consultant-grade Markdown assessment report "
+        "(suitable as a client deliverable) instead of the terminal summary.",
+    )
+    p.add_argument(
         "--version",
         action="version",
         version=f"vibe-explainer {__version__}",
@@ -69,9 +75,10 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _run_security_mode(repo: Path, as_json: bool, out: str | None) -> int:
+def _run_security_mode(repo: Path, as_json: bool, as_consultant: bool, out: str | None) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
+    from .consultant_report import render_consultant_markdown
     from .controls import assess_controls
     from .dataflow import build_dataflow
     from .readiness import assess_readiness
@@ -90,7 +97,12 @@ def _run_security_mode(repo: Path, as_json: bool, out: str | None) -> int:
         print(f"Unable to analyze repository:\n{exc}", file=sys.stderr)
         return 1
 
-    output = report.to_json() if as_json else render_text(report)
+    if as_json:
+        output = report.to_json()
+    elif as_consultant:
+        output = render_consultant_markdown(report)
+    else:
+        output = render_text(report)
 
     if out:
         out_path = Path(out)
@@ -112,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.security:
-        return _run_security_mode(repo, args.json, args.out)
+        return _run_security_mode(repo, args.json, args.consultant, args.out)
 
     # Offline is currently the only implemented path; keep the flag for future LLM mode.
     offline = True if args.offline or True else True
