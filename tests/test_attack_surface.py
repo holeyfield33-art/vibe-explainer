@@ -46,7 +46,7 @@ class TestAttackSurfaceBucketing(unittest.TestCase):
         by_bucket = surface.by_bucket()
         input_names = {i.name for i in by_bucket["inputs"]}
         tool_names = {i.name for i in by_bucket["tools"]}
-        self.assertIn("Webhook", input_names)
+        self.assertIn("Webhook handler", input_names)
         self.assertIn("HTTP client call", tool_names)
 
     def test_every_item_has_a_relevance_note(self):

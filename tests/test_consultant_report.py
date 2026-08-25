@@ -89,8 +89,9 @@ class TestConsultantReportContent(unittest.TestCase):
             self.assertIn(name, md)
 
     def test_truncation_surfaced_in_report(self):
+        # aggregation is surfaced (with exact counts), not as an INCOMPLETE warning
         md = _md("truncation-heavy", assessment_date="2026-01-01")
-        self.assertIn("PARTIAL", md)
+        self.assertIn("AGGREGATED", md)
 
 
 class TestConsultantReportRedaction(unittest.TestCase):

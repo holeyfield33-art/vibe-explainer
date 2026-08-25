@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from . import playbook as _pb
 from .security_report import VibeExplainerReport
 
 _SEVERITY_LABEL = {"CRITICAL": "Critical", "HIGH": "High", "MODERATE": "Moderate", "LOW": "Low"}
@@ -37,7 +38,8 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Header -----------------------------------------------------------
     add("# AI Security Readiness Assessment")
     add("")
-    add("*Powered by Vibe Explainer*")
+    add("*Powered by Vibe Explainer — assessed against the HackerOne "
+        "\"Security for AI: Readiness and Risk Playbook\" framework.*")
     add("")
     add(f"- **Repository:** `{m['repository']}`")
     add(f"- **Assessment date:** {assessment_date or date.today().isoformat()}")
@@ -68,6 +70,11 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         + (f", the highest of which is rated **{_SEVERITY_LABEL.get(highest, highest)}**." if highest else ".")
         )
     add("")
+    add(f"Of **{es['total_findings']}** AI-relevant findings, **{es['production_findings']}** "
+        f"are in production code; the remainder are in test, example, documentation, or "
+        f"generated content. Findings are labelled by context throughout this report so "
+        f"production surface can be distinguished from research and test material.")
+    add("")
     add(f"The repository's demonstrated AI security readiness is assessed as "
         f"**Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**.")
     add("")
@@ -77,8 +84,16 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         "high-severity risk while showing an early-stage readiness level, or vice versa.")
     add("")
     if m["assessment_completeness"] == "PARTIAL":
-        add("> **Note:** This assessment is marked **PARTIAL** because discovery results were "
-            "truncated. The findings below may be incomplete.")
+        add("> ⚠️ **This assessment is INCOMPLETE.** Some files could not be assessed, so the "
+            "counts below are a **lower bound** — the correct reading is *\"at least this many\"*, "
+            "never *\"only this many.\"* A full assessment requires resolving the gaps noted in "
+            "Limitations.")
+        add("")
+    elif m["assessment_completeness"] == "AGGREGATED":
+        add("> **Note:** Some files contained many repeated references to the same component "
+            "(e.g. a data-dense retrieval module). These were summarized with **exact counts** — "
+            "every match was counted; see the Evidence Appendix for per-group totals. The "
+            "assessment is complete.")
         add("")
     add("---")
     add("")
@@ -87,7 +102,10 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("## AI Attack Surface")
     add("")
     add("AI-relevant components discovered in the repository, grouped by the surface they "
-        "belong to. Each item references the finding it was derived from.")
+        "belong to. Each item references the finding it was derived from and is labelled by "
+        "**context** — Production, Test, Example, Documentation, or Generated — so a genuine "
+        "production surface can be told apart from test fixtures, demo payloads, and generated "
+        "manifests that happen to contain the same strings. Production findings are listed first.")
     add("")
     surface = report.attack_surface
     any_surface = False
@@ -98,10 +116,12 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         any_surface = True
         add(f"### {bucket.capitalize()}")
         add("")
-        add("| Component | Location | Confidence | Evidence | Finding |")
-        add("|---|---|---|---|---|")
-        for i in items:
-            add(f"| {i['component']} | `{i['file']}:{i['line']}` | {i['confidence']} | "
+        add("| Component | Context | Location | Confidence | Evidence | Finding |")
+        add("|---|---|---|---|---|---|")
+        # production surface first, then test/example/doc/generated
+        ordered = sorted(items, key=lambda i: (0 if i.get("context") == "PRODUCTION" else 1, i["file"], i["line"]))
+        for i in ordered:
+            add(f"| {i['component']} | {i.get('context', 'PRODUCTION').title()} | `{i['file']}:{i['line']}` | {i['confidence']} | "
                 f"{_cell(i['evidence'])} | `{i['finding_id']}` |")
         add("")
     if not any_surface:
@@ -114,24 +134,40 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("## AI Data Flows")
     add("")
     if report.data_flows:
-        add("Observed same-file relationships between AI components. These are static "
-            "inferences from code proximity, not confirmed runtime data flows.")
+        add("Observed relationships between AI components. These are static inferences "
+            "from code proximity (same-file) and resolved imports (cross-file) — not "
+            "confirmed runtime data flows. The Method column records how each edge was "
+            "resolved; cross-file (IMPORT) edges are bounded inference from import "
+            "resolution, never proven flow.")
         add("")
-        add("| Source | Relationship | Destination | Confidence | Location |")
-        add("|---|---|---|---|---|")
+        add("| Source | Relationship | Destination | Method | Confidence | Location |")
+        add("|---|---|---|---|---|---|")
         for e in report.data_flows:
+            method = e.get("resolution_method", "SAME_FILE")
+            if method == "IMPORT":
+                loc = f"`{e.get('source_file', e['file'])}` → `{e.get('destination_file', e['file'])}`"
+            else:
+                loc = f"`{e['file']}:{e['source_line']}→{e['destination_line']}`"
             add(f"| {e['source']} | `{e['relationship']}` | {e['destination']} | "
-                f"{e['confidence']} | `{e['file']}:{e['source_line']}→{e['destination_line']}` |")
+                f"{method} | {e['confidence']} | {loc} |")
         add("")
     else:
-        add("No AI data-flow relationships were observed. Note that cross-file flows are not "
-            "established by this assessment even when implied by imports.")
+        add("No AI data-flow relationships were observed.")
         add("")
     add("---")
     add("")
 
     # ---- Key risks --------------------------------------------------------
     add("## Key Risks")
+    add("")
+    add("Each scenario is scored with the playbook's AI Risk formula, "
+        f"`{_pb.RISK_FORMULA}`, on a 1–25 scale. Score bands map to severity and to the "
+        "readiness level the playbook associates with that risk:")
+    add("")
+    add("| Score | Severity | Playbook readiness |")
+    add("|---|---|---|")
+    for rng, sev, rd in _pb.risk_band_table_rows():
+        add(f"| {rng} | {sev} | {rd} |")
     add("")
     dist = report.risks["by_severity"]
     add(f"**{report.risks['total']} scenario(s)** — "
@@ -145,9 +181,15 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             add(f"- **Risk ID:** `{s['risk_id']}`")
             add(f"- **Category:** {s['category']}")
             add(f"- **Score:** {s['score']} / 25 ({s['severity']})")
-            add(f"- **Factors:** Exposure {s.get('exposure', '-')}, Safety {s.get('safety_impact', '-')}, "
-                f"Security {s.get('security_exposure', '-')}, Likelihood {s.get('likelihood', '-')}"
-                if 'exposure' in s else f"- **Confidence:** {s['confidence']}")
+            # Playbook factor breakdown, shown as the formula with this scenario's inputs.
+            if s.get("exposure") is not None:
+                e, sa, se, lk = s["exposure"], s["safety_impact"], s["security_exposure"], s["likelihood"]
+                add(f"- **Risk factors (playbook):** Exposure {e}, Safety {sa}, "
+                    f"Security {se}, Likelihood {lk} → ROUND(((({e}+{sa}+{se})/3) × {lk})) = {s['score']}")
+            if s.get("context_adjusted"):
+                add(f"- **Context adjustment:** severity capped — this scenario is driven "
+                    f"entirely by `{s.get('primary_context', 'non-production')}` code, not "
+                    f"production code. The raw score reflects the pattern as if in production.")
             add(f"- **Assessment confidence:** {s['confidence']}")
             add("")
             add(f"{s['rationale']}")
@@ -168,10 +210,12 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Security controls ------------------------------------------------
     add("## Security Controls")
     add("")
-    add("Evidence of security controls found in the repository. **DETECTED** means supporting "
-        "evidence was found — not that the control is complete, effective, or resistant to "
-        "bypass. **NOT_DETECTED** means no supporting evidence was found — not that the control "
-        "definitely does not exist (it may live outside this repository).")
+    add("Evidence of security controls found in the repository, classified by the playbook's "
+        "control taxonomy — **[P] Preventive**, **[V] Validation**, **[G] Governance**. "
+        "**DETECTED** means supporting evidence was found — not that the control is complete, "
+        "effective, or resistant to bypass. **NOT_DETECTED** means no supporting evidence was "
+        "found — not that the control definitely does not exist (it may live outside this "
+        "repository).")
     add("")
     by_status = report.controls["by_status"]
     for status in _CONTROL_STATUS_ORDER:
@@ -180,10 +224,11 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             continue
         add(f"### {status.replace('_', ' ').title()}")
         add("")
-        add("| Control | Confidence | Rationale |")
-        add("|---|---|---|")
+        add("| Class | Control | Confidence | Rationale |")
+        add("|---|---|---|---|")
         for c in sorted(controls, key=lambda c: c["control_id"]):
-            add(f"| {c['control_id']} {c['name']} | {c['confidence']} | {_cell(c['rationale'])} |")
+            cls = _pb.control_class(c["control_id"])
+            add(f"| [{cls}] | {c['control_id']} {c['name']} | {c['confidence']} | {_cell(c['rationale'])} |")
         add("")
     add("---")
     add("")
@@ -191,19 +236,30 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Readiness --------------------------------------------------------
     add("## AI Security Readiness")
     add("")
-    add(f"**Current level: Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**")
+    add("Assessed against the four-level AI Security Readiness model from the HackerOne "
+        "*Security for AI: Readiness and Risk Playbook* (Baseline → Managed → Hardened → "
+        "Continuous).")
     add("")
+    lvl_meta = _pb.level_meta(level)
+    add(f"**Current level: Level {level} — {lvl_meta['name']}**")
+    add("")
+    if lvl_meta["goal"]:
+        add(f"- **Level goal (playbook):** {lvl_meta['goal']}")
+        add(f"- **Testing posture:** {lvl_meta['posture']}")
+        add(f"- **Typical platform at this level:** {_pb.platform_archetype(level)}")
+        add("")
     blocked = report.readiness.get("blocked_from_next_level")
     if blocked:
         add(f"**Blocked from the next level by:** {blocked}")
         add("")
-    add("| Level | Name | Status | Notes |")
-    add("|---|---|---|---|")
+    add("| Level | Name | Playbook goal | Status | Notes |")
+    add("|---|---|---|---|---|")
     for la in report.readiness["level_assessments"]:
         note = ""
         if la["status"] != "ACHIEVED" and la["missing_requirements"]:
             note = la["missing_requirements"][0]
-        add(f"| {la['level']} | {_LEVEL_NAME.get(la['level'], la['name'])} | {la['status']} | {_cell(note)} |")
+        meta = _pb.level_meta(la["level"])
+        add(f"| {la['level']} | {meta['name']} | {_cell(meta['goal'])} | {la['status']} | {_cell(note)} |")
     add("")
     add("---")
     add("")

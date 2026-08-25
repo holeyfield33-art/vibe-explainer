@@ -32,7 +32,7 @@ from .controls import (
     ControlAssessment,
 )
 from .dataflow import DataFlowGraph
-from .risk import COMPLETENESS_PARTIAL, RiskAssessment
+from .risk import COMPLETENESS_AGGREGATED, COMPLETENESS_PARTIAL, RiskAssessment
 from .scanner import SKIP_DIRS
 
 STATUS_ACHIEVED = "ACHIEVED"
@@ -282,7 +282,7 @@ def assess_readiness(
     multiplied together.
     """
     root = discovery.root
-    completeness = COMPLETENESS_PARTIAL if discovery.truncated else risks.assessment_completeness
+    completeness = COMPLETENESS_AGGREGATED if discovery.truncated else risks.assessment_completeness
 
     if not discovery.has_ai_signal():
         return ReadinessAssessment(
@@ -352,9 +352,14 @@ def assess_readiness(
     # ---- LEVEL 2 — MANAGED ----------------------------------------------
     # Mandatory gate: evidence of a REPEATABLE security test/eval practice.
     # Per directive: "No recurring adversarial testing -> cannot award Level 2."
-    l2_gate = bool(signals.security_test_artifact) or bool(signals.documented_eval_process)
+    # Phase 8I: content-classified SECURITY_TEST findings are also evidence of
+    # adversarial testing — a file whose content marks it a security test counts
+    # even if its path didn't match the path-convention scan.
+    security_test_findings = [f for f in discovery.findings if getattr(f, "context", "") == "SECURITY_TEST"]
+
+    l2_gate = bool(signals.security_test_artifact) or bool(signals.documented_eval_process) or bool(security_test_findings)
     l2_supporting = []
-    if signals.security_test_artifact:
+    if signals.security_test_artifact or security_test_findings:
         l2_supporting.append("security_test_artifact")
     if signals.documented_eval_process:
         l2_supporting.append("documented_eval_process")

@@ -15,6 +15,10 @@ from typing import Any
 from . import __version__
 from .ai_discovery import DiscoveryResult
 from .attack_surface import BUCKETS, AttackSurfaceResult
+from .context_classifier import CONTEXT_PRODUCTION, classify_path
+
+# Fine-grained contexts (Phase 8) that count as production-relevant in the report.
+_PRODUCTION_RELEVANT_REPORT_CONTEXTS = frozenset({"PRODUCTION", "CONFIGURATION", "UNKNOWN"})
 from .controls import ControlAssessment
 from .dataflow import DataFlowGraph
 from .readiness import NO_AI_SURFACE, ReadinessAssessment
@@ -47,6 +51,21 @@ def _redact_check(text: str) -> str:
     from .risk import _redact
 
     return _redact(text)
+
+
+def _repo_name(root: str) -> str:
+    """Extract a display name (the project's directory name) from a repository root
+    path, handling both POSIX and Windows separators and trailing slashes. Falls back
+    to the raw string if no basename can be derived. This keeps an assessor's local
+    filesystem layout out of the deliverable header."""
+    if not root:
+        return "repository"
+    normalized = root.replace("\\", "/").rstrip("/")
+    # Drop a Windows drive prefix like "C:" if that's somehow all that's left.
+    name = normalized.rsplit("/", 1)[-1]
+    if not name or name.endswith(":"):
+        return normalized or "repository"
+    return name
 
 
 @dataclass
@@ -92,11 +111,18 @@ def build_report(
     """Assemble the full report from already-computed Phase 1-6 results. No new
     scanning, scoring, or classification happens here."""
 
+    # Repository identity: the project name (basename) is what belongs in a
+    # deliverable. The full local path is retained separately for traceability but
+    # is not what a report header should expose — the first real-world run leaked
+    # an assessor's local path (C:\Users\...\aletheia-core) into the report header.
+    repo_name = _repo_name(discovery.root)
+
     metadata = {
         "tool": "vibe-explainer",
         "version": __version__,
         "schema_version": "1.0",
-        "repository": discovery.root,
+        "repository": repo_name,
+        "repository_path": discovery.root,
         "assessment_completeness": readiness.assessment_completeness,
     }
 
@@ -104,6 +130,18 @@ def build_report(
     highest_severity = None
     if risks.scenarios:
         highest_severity = min(risks.scenarios, key=lambda s: _SEVERITY_ORDER.get(s.severity, 99)).severity
+
+    # Context breakdown: how much of the discovered surface is production code vs
+    # test/example/doc/generated content. This is the key signal the first
+    # real-world run (aletheia-core) showed was missing — a production webhook and
+    # a test-fixture string were indistinguishable in the report.
+    context_counts: dict[str, int] = {}
+    production_findings = 0
+    for f in discovery.findings:
+        ctx = getattr(f, "context", None) or classify_path(f.file)
+        context_counts[ctx] = context_counts.get(ctx, 0) + 1
+        if ctx in _PRODUCTION_RELEVANT_REPORT_CONTEXTS:
+            production_findings += 1
 
     if not ai_surface_detected:
         statement = "No AI security assessment was generated because no AI surface was detected."
@@ -120,6 +158,9 @@ def build_report(
         "readiness_level": readiness.readiness_level,
         "readiness_name": readiness.readiness_name,
         "assessment_completeness": readiness.assessment_completeness,
+        "total_findings": len(discovery.findings),
+        "production_findings": production_findings,
+        "findings_by_context": dict(sorted(context_counts.items())),
         "statement": statement,
     }
 
@@ -134,6 +175,7 @@ def build_report(
                 "name": f.name,
                 "evidence": _redact_check(f.evidence),
                 "confidence": f.confidence,
+                "context": getattr(f, "context", None) or classify_path(f.file),
             }
         )
     for items in by_category.values():
@@ -141,7 +183,11 @@ def build_report(
     ai_inventory = {
         "categories": dict(sorted(by_category.items())),
         "truncated": [t.to_dict() for t in discovery.truncated],
-        "truncation_notice": "Discovery results were truncated; inventory may be incomplete." if discovery.truncated else None,
+        "truncation_notice": (
+            "Some files contained many repeated matches of the same pattern; these were "
+            "summarized with exact counts (see per-group totals). All matches were counted — "
+            "nothing was left unassessed."
+        ) if discovery.truncated else None,
     }
 
     # ---- Attack surface: all six buckets, always present -------------------
@@ -156,6 +202,7 @@ def build_report(
                 "confidence": i.confidence,
                 "finding_id": i.finding_id,
                 "security_relevance": i.security_relevance,
+                "context": getattr(i, "context", None) or classify_path(i.file),
             }
             for i in sorted(by_bucket[b], key=lambda i: (i.file, i.line, i.finding_id))
         ]
@@ -173,6 +220,9 @@ def build_report(
             "file": e.file,
             "source_line": e.source_line,
             "destination_line": e.destination_line,
+            "resolution_method": getattr(e, "resolution_method", "SAME_FILE"),
+            "source_file": getattr(e, "source_file", "") or e.file,
+            "destination_file": getattr(e, "destination_file", "") or e.file,
             "evidence": _redact_check(e.evidence),
         }
         for e in dataflow.edges
@@ -215,12 +265,18 @@ def build_report(
                 "category": s.category,
                 "score": s.score,
                 "severity": s.severity,
+                "exposure": s.exposure,
+                "safety_impact": s.safety_impact,
+                "security_exposure": s.security_exposure,
+                "likelihood": s.likelihood,
                 "confidence": s.confidence,
                 "rationale": _redact_check(s.rationale),
                 "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in s.evidence],
                 "related_finding_ids": s.related_finding_ids,
                 "related_dataflow_ids": s.related_dataflow_ids,
                 "related_control_ids": s.related_control_ids,
+                "primary_context": s.primary_context,
+                "context_adjusted": s.context_adjusted,
             }
             for s in sorted_scenarios
         ],
@@ -295,7 +351,11 @@ def build_report(
     # ---- Limitations -----------------------------------------------------
     limitations = list(_STANDARD_LIMITATIONS)
     if discovery.truncated:
-        limitations.append("Discovery results were truncated for this repository; findings, controls, risks, and readiness evidence may all be incomplete as a result.")
+        limitations.append(
+            "Some files contained many repeated matches of the same pattern; the report lists "
+            "representative findings plus an exact count of the remainder (see the evidence "
+            "appendix). All matches were counted — this is summarization, not an incomplete scan."
+        )
     for lim in readiness.limitations:
         if lim not in limitations:
             limitations.append(lim)
@@ -363,6 +423,10 @@ def render_text(report: VibeExplainerReport) -> str:
         _render_limitations(add, report)
         return "\n".join(lines)
 
+    add(f"FINDINGS\n{es['total_findings']} total "
+        f"({es['production_findings']} in production code, "
+        f"{es['total_findings'] - es['production_findings']} in test/example/docs/generated)")
+    add("")
     add(f"RISKS\n{es['risk_scenario_count']} scenario(s)")
     add(f"Highest: {es['highest_risk_severity'] or 'none'}")
     add("")
@@ -370,7 +434,11 @@ def render_text(report: VibeExplainerReport) -> str:
     level_display = f"Level {level} — {_LEVEL_DISPLAY.get(level, es['readiness_name'])}" if level else es["readiness_name"]
     add(f"READINESS\n{level_display}")
     if es["assessment_completeness"] == "PARTIAL":
-        add("(assessment PARTIAL — discovery results were truncated)")
+        add("!! ASSESSMENT INCOMPLETE — some files could not be assessed. Findings/risks")
+        add("   below are a lower bound. Do not read as \"only N risks\".")
+    elif es["assessment_completeness"] == "AGGREGATED":
+        add("(Some files had many repeated matches; these were summarized with exact")
+        add(" counts. The assessment is complete — see the evidence appendix for totals.)")
     add("")
     add(sep)
 

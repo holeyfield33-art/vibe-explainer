@@ -62,6 +62,7 @@ class AttackSurfaceItem:
     confidence: str
     security_relevance: str
     finding_id: str = ""  # traces back to the source AIFinding.id
+    context: str = "PRODUCTION"  # Phase 8: file context of the source finding
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -74,6 +75,7 @@ class AttackSurfaceItem:
             "confidence": self.confidence,
             "security_relevance": self.security_relevance,
             "finding_id": self.finding_id,
+            "context": self.context,
         }
 
 
@@ -108,7 +110,7 @@ def _bucket_for(finding: AIFinding) -> str:
     if finding.category == "external_integration":
         # Webhooks are inbound triggers; everything else in this category is
         # an outbound call the app makes, which behaves like a tool.
-        return "inputs" if finding.name == "Webhook" else "tools"
+        return "inputs" if finding.name == "Webhook handler" else "tools"
     return _CATEGORY_BUCKET.get(finding.category, "tools")
 
 
@@ -147,6 +149,7 @@ def build_attack_surface(discovery: DiscoveryResult, *, include_dataflow: bool =
                 confidence=finding.confidence,
                 security_relevance=_relevance_for(finding),
                 finding_id=finding.id,
+                context=getattr(finding, "context", "PRODUCTION"),
             )
         )
     if include_dataflow:

@@ -7,6 +7,7 @@ from vibe_explainer.controls import assess_controls
 from vibe_explainer.dataflow import build_dataflow
 from vibe_explainer.risk import (
     COMPLETENESS_COMPLETE,
+    COMPLETENESS_AGGREGATED,
     COMPLETENESS_PARTIAL,
     SEVERITY_CRITICAL,
     SEVERITY_HIGH,
@@ -199,10 +200,11 @@ class TestHighImpactAction(unittest.TestCase):
 
 
 class TestTruncatedDiscovery(unittest.TestCase):
-    def test_completeness_partial_when_truncated(self):
+    def test_completeness_aggregated_when_truncated(self):
+        # Repeated same-pattern matches summarized past the display cap are fully
+        # counted -> AGGREGATED (thorough), not PARTIAL (a genuine gap).
         assessment = _assess("truncation-heavy")
-        self.assertEqual(assessment.assessment_completeness, COMPLETENESS_PARTIAL)
-        self.assertIn("truncated", assessment.summary_note.lower())
+        self.assertEqual(assessment.assessment_completeness, COMPLETENESS_AGGREGATED)
 
     def test_completeness_complete_when_not_truncated(self):
         assessment = _assess("basic-chatbot")

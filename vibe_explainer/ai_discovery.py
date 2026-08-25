@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from .scanner import SKIP_DIRS
+from .file_context import classify_file
 
 # Extensions worth content-scanning for AI evidence. Broader than scanner.CODE_EXTS
 # because config/env files are where secrets and MCP transport config tend to live.
@@ -67,6 +68,8 @@ class AIFinding:
     evidence: str
     confidence: Confidence
     id: str = ""
+    context: str = "PRODUCTION"  # file context (Phase 8D): PRODUCTION/TEST/SECURITY_TEST/...
+    context_confidence: str = "moderate"
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -81,6 +84,8 @@ class AIFinding:
             "line": self.line,
             "evidence": self.evidence,
             "confidence": self.confidence,
+            "context": self.context,
+            "context_confidence": self.context_confidence,
         }
 
 
@@ -109,6 +114,10 @@ class DiscoveryResult:
     findings: list[AIFinding] = field(default_factory=list)
     files_scanned: int = 0
     truncated: list[TruncatedGroup] = field(default_factory=list)
+    # Phase 8G: file -> list of repo-relative files it imports (resolved via AST/
+    # regex import resolution). Only repo-internal imports appear here; external
+    # packages are excluded. Used to build cross-file dataflow edges.
+    imports_by_file: dict[str, list[str]] = field(default_factory=dict)
 
     def by_category(self) -> dict[str, list[AIFinding]]:
         out: dict[str, list[AIFinding]] = {}
@@ -162,9 +171,17 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("ai_usage", "LangChain", re.compile(r"\b(?:import\s+langchain|from\s+langchain)"), "high"),
     ("ai_usage", "LlamaIndex", re.compile(r"\b(?:import\s+llama_index|from\s+llama_index)"), "high"),
     ("ai_usage", "Agent framework", re.compile(r"\b(?:AgentExecutor|create_agent|initialize_agent)\("), "moderate"),
+    # TS/JS idioms — modern apps call models via raw fetch to the provider endpoint
+    # or via the Vercel AI SDK, not the Python-style SDK. These are the highest-value
+    # additions found on the creator-ai-hub validation run.
+    ("ai_usage", "OpenAI-compatible HTTP endpoint", re.compile(r"api\.openai\.com/v1|/v1/chat/completions|/chat/completions\b"), "high"),
+    ("ai_usage", "Whisper transcription endpoint", re.compile(r"\bwhisper-1\b|/audio/transcriptions\b"), "high"),
+    ("ai_usage", "Vercel AI SDK call", re.compile(r"\b(?:generateText|streamText|generateObject|streamObject)\s*\(|@ai-sdk/"), "high"),
+    ("ai_usage", "Chat messages array", re.compile(r"\bmessages\s*:\s*\[\s*\{\s*role\s*:"), "moderate"),
     # --- PROMPT SURFACES ----------------------------------------------------
     ("prompt_surface", "System prompt variable", re.compile(r"\b(?:SYSTEM_PROMPT|system_prompt|systemPrompt)\b\s*[:=]"), "high"),
     ("prompt_surface", "Prompt template", re.compile(r"\bPromptTemplate\(|prompt_template\s*[:=]"), "moderate"),
+    ("prompt_surface", "Chat role message", re.compile(r"\brole\s*:\s*['\"](?:system|user|assistant)['\"]"), "moderate"),
     ("prompt_surface", "Generic prompt variable", re.compile(r"\b(?:prompt|PROMPT)\b\s*[:=]\s*(?:f?[\"'])"), "low"),
     # --- RAG / RETRIEVAL ----------------------------------------------------
     ("rag_retrieval", "Pinecone", re.compile(r"\bpinecone\b", re.IGNORECASE), "high"),
@@ -178,7 +195,12 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("tool_agent", "Tool/function decorator", re.compile(r"@tool\b|@function_tool\b"), "high"),
     ("tool_agent", "Function-calling config", re.compile(r"\b(?:tool_choice|function_call)\s*[:=]"), "moderate"),
     ("tool_agent", "Shell execution", re.compile(r"\b(?:subprocess\.(?:run|Popen|call)|os\.system|os\.popen)\("), "high"),
-    ("tool_agent", "Dynamic code execution", re.compile(r"\b(?:eval|exec)\("), "moderate"),
+    # Guard against JS false positives: `.exec(` is a method call (regex.exec,
+    # child.exec via a member) and JS `re.exec(str)` is a regex match, not code
+    # execution. Require eval/exec NOT preceded by a dot, and for exec require it
+    # to look like a bare call. This still catches Python eval(/exec( and bare
+    # exec( / eval(, but not `foo.exec(` or `re.exec(`.
+    ("tool_agent", "Dynamic code execution", re.compile(r"(?<![.\w])(?:eval|exec)\("), "moderate"),
     # --- MCP ----------------------------------------------------------------
     ("mcp", "MCP SDK", re.compile(r"\bmodelcontextprotocol\b|\bfrom\s+mcp\s+import|\bimport\s+mcp\b"), "high"),
     ("mcp", "FastMCP server", re.compile(r"\bFastMCP\(|@mcp\.tool\b|@mcp\.resource\b"), "high"),
@@ -186,11 +208,14 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("mcp", "MCP server config", re.compile(r"\"mcpServers\"|'mcpServers'|mcp_servers\s*[:=]"), "high"),
     # --- EXTERNAL INTEGRATIONS ------------------------------------------
     ("external_integration", "HTTP client call", re.compile(r"\b(?:requests\.(?:get|post|put|delete)|httpx\.(?:get|post|put|delete))\("), "moderate"),
-    ("external_integration", "Webhook", re.compile(r"\bwebhook\b", re.IGNORECASE), "low"),
+    # Webhook: the bare word matched fixture names, regex patterns, and corpus
+    # descriptions across every validation repo (16 hits, 0 real). Require an
+    # actual webhook handler/registration idiom instead of the bare noun.
+    ("external_integration", "Webhook handler", re.compile(r"(?i)\b(?:on_webhook|handle_webhook|webhook_handler|register_webhook|@webhook)\b|\bapp\.(?:post|route)\(['\"][^'\"]*webhook"), "moderate"),
     ("external_integration", "SQL database client", re.compile(r"\b(?:psycopg2|sqlalchemy|pymongo)\b"), "moderate"),
     ("external_integration", "Redis client", re.compile(r"\bredis\.(?:Redis|StrictRedis)\("), "moderate"),
     # --- SECRETS / CONFIGURATION -----------------------------------------
-    ("secret_config", "Model API key env var", re.compile(r"\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_KEY|HUGGINGFACE_TOKEN|COHERE_API_KEY|GOOGLE_API_KEY)\b"), "high"),
+    ("secret_config", "Model API key env var", re.compile(r"\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_KEY|HUGGINGFACE_TOKEN|COHERE_API_KEY|GOOGLE_API_KEY|AI_API_KEY|AI_MODEL|AI_BASE_URL)\b"), "high"),
     ("secret_config", "Possible hardcoded API key", re.compile(r"sk-[A-Za-z0-9_-]{20,}"), "high"),
     ("secret_config", "Generic API key reference", re.compile(r"\bAPI_KEY\b\s*[:=]"), "low"),
 ]
@@ -244,6 +269,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
     index_by_id: dict[str, int] = {}
     truncated_ids: set[str] = set()  # (file,line,category,name) identities already counted as truncated
     _CONFIDENCE_PRIORITY = {"high": 3, "moderate": 2, "low": 1}
+    file_texts: dict[str, str] = {}  # rel -> content, for Phase 8G import resolution
 
     for file_path in _iter_candidate_files(root_path):
         text = _read_text(file_path)
@@ -251,6 +277,10 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
             continue
         result.files_scanned += 1
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+        file_texts[rel] = text
+        # Classify the file's context once (content-aware), reused for every
+        # finding in this file. (Phase 8D)
+        file_ctx = classify_file(rel, content=text)
 
         for category, name, pattern, confidence in _PATTERNS:
             for match in pattern.finditer(text):
@@ -301,6 +331,18 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                 if len(evidence) > 160:
                     evidence = evidence[:157] + "..."
 
+                effective_confidence = confidence
+                # Match-context guard: a dangerous-call token (eval/exec/shell) that
+                # sits inside a string literal or a comment is very likely a
+                # detection signature, an example, or documentation prose — not a
+                # live call. Downgrade confidence rather than dropping the finding
+                # (no silent drops), so a security tool's own signature strings
+                # don't read as production code execution.
+                if name in _SIGNATURE_PRONE_NAMES and _match_in_string_or_comment(
+                    text, match.start(), line_start, comment_only=name in _COMMENT_ONLY_GUARD_NAMES
+                ):
+                    effective_confidence = "low"
+
                 index_by_id[fid] = len(result.findings)
                 result.findings.append(
                     AIFinding(
@@ -309,8 +351,83 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                         file=rel,
                         line=line_no,
                         evidence=evidence,
-                        confidence=confidence,
+                        confidence=effective_confidence,
+                        context=file_ctx.context,
+                        context_confidence=file_ctx.confidence,
                     )
                 )
 
+    # Phase 8G: resolve repo-internal imports once, for cross-file dataflow.
+    result.imports_by_file = _resolve_internal_imports(file_texts)
+
     return result
+
+
+def _resolve_internal_imports(file_texts: dict[str, str]) -> dict[str, list[str]]:
+    """Build file -> [resolved repo-internal imported files] using the AST/regex
+    symbol index. Only files that actually contain AI findings matter downstream,
+    but resolving for all scanned files keeps this independent of finding order.
+    External packages resolve to None and are omitted."""
+    from .symbol_index import build_symbol_index, resolve_js_import, resolve_python_import
+
+    pairs = list(file_texts.items())
+    index = build_symbol_index(pairs)
+    out: dict[str, list[str]] = {}
+    for rel, _text in pairs:
+        info = index.modules.get(rel)
+        if info is None:
+            continue
+        resolved: list[str] = []
+        for target in info.imports:
+            if info.language == "python":
+                hit = resolve_python_import(rel, target, index)
+            else:
+                hit = resolve_js_import(rel, target, index)
+            if hit and hit != rel:
+                resolved.append(hit)
+        if resolved:
+            out[rel] = sorted(set(resolved))
+    return out
+
+
+# Pattern names most prone to string-literal / comment false positives (a security
+# tool scanning FOR these tokens, or documenting an endpoint in a docstring, will
+# have them as literals/comments in its source).
+_SIGNATURE_PRONE_NAMES = frozenset({
+    "Dynamic code execution",
+    "Shell execution",
+    "OpenAI-compatible HTTP endpoint",
+    "Whisper transcription endpoint",
+})
+
+
+def _match_in_string_or_comment(text: str, match_start: int, line_start: int, *, comment_only: bool = False) -> bool:
+    """Best-effort check: is the match position inside a quoted string or after a
+    line-comment marker on its own line? Line-scoped and language-agnostic — not a
+    real parser, deliberately conservative (only flags clear cases).
+
+    comment_only=True restricts the check to comment/docstring context (leading //,
+    #, or * ) and ignores string-literal heuristics — used for patterns like
+    endpoint URLs that legitimately live inside a template literal passed to fetch()
+    (a live call), where a bare backtick must NOT demote the finding."""
+    prefix = text[line_start:match_start]
+    stripped = prefix.lstrip()
+    # comment markers: // (js), # (py/sh), or a leading * (inside a block comment)
+    if "//" in prefix or "#" in prefix or stripped.startswith("*") or stripped.startswith("/*"):
+        return True
+    if comment_only:
+        return False
+    # odd number of unescaped quotes before the match => inside a string literal
+    for q in ("'", '"', "`"):
+        count = len(re.findall(r"(?<!\\)" + re.escape(q), prefix))
+        if count % 2 == 1:
+            return True
+    return False
+
+
+# Patterns where a string-literal is genuinely a live call argument (endpoint URLs in
+# fetch template literals), so only comment/docstring context should demote them.
+_COMMENT_ONLY_GUARD_NAMES = frozenset({
+    "OpenAI-compatible HTTP endpoint",
+    "Whisper transcription endpoint",
+})
