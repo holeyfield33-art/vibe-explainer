@@ -98,3 +98,28 @@ Three real repos, three distinct fix classes, no fix damaging another repo's res
 context on findings, context-aware risk capping (and its production non-capping),
 readiness security-test credit, and AST cross-file resolution (internal resolves,
 external does not, malformed does not crash).
+
+## Quality gate (8O) — verified
+
+All 20 gate items pass: full suite green (248 tests); two-pass crawl with zero
+unexplained drops; `.github` analyzed (not excluded) while `.git` is; production/test/
+example/documentation contexts distinguishable; security tests not reported as
+production vulnerabilities (context-capped); truncation visible and quantified;
+cross-file Python and JS/TS relationships resolve; unrelated files generate no
+cross-file edges; confidence levels documented and keyed to resolution method; all
+report references resolve (no dangling IDs); secret redaction holds across every
+report section; default CLI and `--security` / `--security --json` remain backward-
+compatible; no-AI repositories remain NO_AI_SURFACE; risk and readiness remain
+independent; Vibe Explainer's own generated artifacts cannot inflate its readiness;
+new tests cover every bug class fixed in this phase.
+
+## Cross-file data flow (8G) — summary
+
+Discovery resolves repo-internal imports (AST for Python, regex for JS/TS) into
+`DiscoveryResult.imports_by_file`; external packages are excluded. `build_dataflow`
+emits cross-file edges (`resolution_method="IMPORT"`, capped at moderate confidence,
+carrying `source_file`/`destination_file`) when a source-category finding in an
+importer pairs with a destination-category finding in an imported module. Unrelated
+files never connect. This is bounded static inference from import resolution — an
+import establishes reachability between symbols, not proven runtime data flow, and the
+edge evidence text says so.
