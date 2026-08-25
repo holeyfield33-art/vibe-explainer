@@ -178,7 +178,12 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("tool_agent", "Tool/function decorator", re.compile(r"@tool\b|@function_tool\b"), "high"),
     ("tool_agent", "Function-calling config", re.compile(r"\b(?:tool_choice|function_call)\s*[:=]"), "moderate"),
     ("tool_agent", "Shell execution", re.compile(r"\b(?:subprocess\.(?:run|Popen|call)|os\.system|os\.popen)\("), "high"),
-    ("tool_agent", "Dynamic code execution", re.compile(r"\b(?:eval|exec)\("), "moderate"),
+    # Guard against JS false positives: `.exec(` is a method call (regex.exec,
+    # child.exec via a member) and JS `re.exec(str)` is a regex match, not code
+    # execution. Require eval/exec NOT preceded by a dot, and for exec require it
+    # to look like a bare call. This still catches Python eval(/exec( and bare
+    # exec( / eval(, but not `foo.exec(` or `re.exec(`.
+    ("tool_agent", "Dynamic code execution", re.compile(r"(?<![.\w])(?:eval|exec)\("), "moderate"),
     # --- MCP ----------------------------------------------------------------
     ("mcp", "MCP SDK", re.compile(r"\bmodelcontextprotocol\b|\bfrom\s+mcp\s+import|\bimport\s+mcp\b"), "high"),
     ("mcp", "FastMCP server", re.compile(r"\bFastMCP\(|@mcp\.tool\b|@mcp\.resource\b"), "high"),
@@ -301,6 +306,16 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                 if len(evidence) > 160:
                     evidence = evidence[:157] + "..."
 
+                effective_confidence = confidence
+                # Match-context guard: a dangerous-call token (eval/exec/shell) that
+                # sits inside a string literal or a comment is very likely a
+                # detection signature, an example, or documentation prose — not a
+                # live call. Downgrade confidence rather than dropping the finding
+                # (no silent drops), so a security tool's own signature strings
+                # don't read as production code execution.
+                if name in _SIGNATURE_PRONE_NAMES and _match_in_string_or_comment(text, match.start(), line_start):
+                    effective_confidence = "low"
+
                 index_by_id[fid] = len(result.findings)
                 result.findings.append(
                     AIFinding(
@@ -309,8 +324,30 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                         file=rel,
                         line=line_no,
                         evidence=evidence,
-                        confidence=confidence,
+                        confidence=effective_confidence,
                     )
                 )
 
     return result
+
+
+# Pattern names most prone to string-literal / comment false positives (a security
+# tool scanning FOR these tokens will have them as literals/comments in its source).
+_SIGNATURE_PRONE_NAMES = frozenset({"Dynamic code execution", "Shell execution"})
+
+
+def _match_in_string_or_comment(text: str, match_start: int, line_start: int) -> bool:
+    """Best-effort check: is the match position inside a quoted string or after a
+    line-comment marker on its own line? Line-scoped and language-agnostic — not a
+    real parser, deliberately conservative (only flags clear cases)."""
+    prefix = text[line_start:match_start]
+    # line comment before the match (# for py/sh, // for js/ts)
+    if "#" in prefix or "//" in prefix:
+        return True
+    # odd number of unescaped quotes before the match => inside a string literal
+    for q in ("'", '"', "`"):
+        # ignore escaped quotes
+        count = len(re.findall(r"(?<!\\)" + re.escape(q), prefix))
+        if count % 2 == 1:
+            return True
+    return False

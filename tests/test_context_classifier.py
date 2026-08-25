@@ -32,8 +32,13 @@ class TestContextClassifier(unittest.TestCase):
             self.assertEqual(classify_path(p), CONTEXT_TEST, msg=p)
 
     def test_examples_and_demos_detected(self):
-        for p in ("examples/chatbot.py", "demo/app.py", "scripts/demo_layer_comparison.py", "samples/x.py", "fixtures/data.py"):
+        for p in ("examples/chatbot.py", "demo/app.py", "scripts/demo_layer_comparison.py", "samples/x.py"):
             self.assertEqual(classify_path(p), CONTEXT_EXAMPLE, msg=p)
+
+    def test_fixtures_map_to_test_context(self):
+        # Fixtures are test-support, not examples — in the coarse view they read
+        # as TEST (the fine-grained taxonomy has a dedicated FIXTURE context).
+        self.assertEqual(classify_path("fixtures/data.py"), CONTEXT_TEST)
 
     def test_documentation_detected(self):
         for p in ("docs/guide.md", "README.md", "notes.rst", "CHANGELOG.txt"):
