@@ -198,7 +198,7 @@ def _control_evidence_ref(control: SecurityControl | None) -> list[RiskEvidenceR
         RiskEvidenceRef(
             type="control",
             id=control.control_id,
-            description=f"{control.control_id} {control.name}: {control.status} — {control.rationale}",
+            description=_redact(f"{control.control_id} {control.name}: {control.status} — {control.rationale}"),
         )
     ]
 
@@ -209,7 +209,13 @@ def _finding_evidence_ref(f: AIFinding, note: str) -> RiskEvidenceRef:
 
 
 def _dataflow_evidence_ref(e: DataFlowObservation, note: str) -> RiskEvidenceRef:
-    return RiskEvidenceRef(type="dataflow", id=_edge_key(e), description=f"{note}: {e.relationship} ({e.confidence} confidence), {e.evidence}")
+    # Defense-in-depth: DataFlowObservation.evidence is a synthesized category/line
+    # description today, not a literal source-line reproduction, so it can't
+    # currently carry a raw secret — but the redaction boundary must hold
+    # regardless of what any given evidence string happens to contain, not rely on
+    # today's field semantics staying that way.
+    text = _redact(f"{note}: {e.relationship} ({e.confidence} confidence), {e.evidence}")
+    return RiskEvidenceRef(type="dataflow", id=_edge_key(e), description=text)
 
 
 def assess_risks(

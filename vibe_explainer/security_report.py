@@ -217,7 +217,7 @@ def build_report(
                 "severity": s.severity,
                 "confidence": s.confidence,
                 "rationale": _redact_check(s.rationale),
-                "evidence": [e.to_dict() for e in s.evidence],
+                "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in s.evidence],
                 "related_finding_ids": s.related_finding_ids,
                 "related_dataflow_ids": s.related_dataflow_ids,
                 "related_control_ids": s.related_control_ids,

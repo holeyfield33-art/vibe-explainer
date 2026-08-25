@@ -185,6 +185,18 @@ class TestSecretRedaction(unittest.TestCase):
         self.assertNotIn("abcdefghijklmnopqrstuvwxyz012345", js)
         self.assertIn("[REDACTED]", js)
 
+    def test_risk_scenario_evidence_specifically_redacted(self):
+        # Pinpoint check on the exact field an external review flagged: the risk
+        # scenario evidence list was being serialized with e.to_dict() and no
+        # redaction pass at the Phase 7 boundary. Verify the specific field now.
+        report = _report("hardcoded-credential")
+        secret_scenarios = [s for s in report.risks["scenarios"] if s["category"] == "SECRET_EXPOSURE"]
+        self.assertTrue(secret_scenarios)
+        for scenario in secret_scenarios:
+            for e in scenario["evidence"]:
+                self.assertNotIn("sk-proj-", e["description"])
+                self.assertNotIn("abcdefghijklmnopqrstuvwxyz012345", e["description"])
+
 
 class TestJSONValidity(unittest.TestCase):
     def test_valid_json_no_ansi(self):

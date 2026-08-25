@@ -132,6 +132,45 @@ class TestSecretExposure(unittest.TestCase):
         self.assertEqual(_by_category(clean, "SECRET_EXPOSURE"), [])
 
 
+class TestRedactionBoundaryHoldsRegardlessOfPath(unittest.TestCase):
+    """Regression coverage for a gap an external review found: redaction must hold
+    for EVERY evidence description this module produces, not just the specific
+    field a particular fixture happens to exercise. Tests the redaction helpers
+    directly with a synthetic secret, independent of whether today's fixtures can
+    naturally coerce a secret into that specific code path."""
+
+    def test_dataflow_evidence_ref_redacts_regardless_of_content(self):
+        from vibe_explainer.dataflow import STATUS_INFERRED, DataFlowObservation
+        from vibe_explainer.risk import _dataflow_evidence_ref
+
+        fake_edge = DataFlowObservation(
+            source_finding_id="aaa", destination_finding_id="bbb",
+            source_type="secret_config", destination_type="ai_usage",
+            relationship="reads_storage", file="x.py", source_line=1, destination_line=2,
+            confidence="high",
+            evidence="synthetic evidence containing sk-proj-abcdefghijklmnopqrstuvwxyz012345",
+            status=STATUS_INFERRED,
+        )
+        ref = _dataflow_evidence_ref(fake_edge, "test note")
+        self.assertNotIn("sk-proj-abcdefghijklmnopqrstuvwxyz012345", ref.description)
+        self.assertIn("[REDACTED]", ref.description)
+
+    def test_control_evidence_ref_redacts_regardless_of_content(self):
+        from vibe_explainer.controls import SecurityControl
+        from vibe_explainer.risk import _control_evidence_ref
+
+        fake_control = SecurityControl(
+            control_id="C08", name="Secret Management", category="SECRET_MANAGEMENT",
+            status="NOT_DETECTED", confidence="high", evidence=[],
+            related_finding_ids=[], related_dataflow_ids=[],
+            rationale="Found sk-proj-abcdefghijklmnopqrstuvwxyz012345 hardcoded in source.",
+        )
+        refs = _control_evidence_ref(fake_control)
+        self.assertEqual(len(refs), 1)
+        self.assertNotIn("sk-proj-abcdefghijklmnopqrstuvwxyz012345", refs[0].description)
+        self.assertIn("[REDACTED]", refs[0].description)
+
+
 class TestRAGWithoutControls(unittest.TestCase):
     def test_rag_security_scenario_generated(self):
         assessment = _assess("rag-app")
