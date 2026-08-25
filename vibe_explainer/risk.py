@@ -43,7 +43,8 @@ SEVERITY_HIGH = "HIGH"
 SEVERITY_CRITICAL = "CRITICAL"
 
 COMPLETENESS_COMPLETE = "COMPLETE"
-COMPLETENESS_PARTIAL = "PARTIAL"
+COMPLETENESS_AGGREGATED = "AGGREGATED"  # repeated matches summarized but fully counted — still trustworthy
+COMPLETENESS_PARTIAL = "PARTIAL"  # a genuine gap: something could not be assessed
 
 _SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{20,}")
 
@@ -262,7 +263,12 @@ def assess_risks(
     framework's unmodified four-factor formula.
     """
     root = discovery.root
-    completeness = COMPLETENESS_PARTIAL if discovery.truncated else COMPLETENESS_COMPLETE
+    # Truncation here means repeated same-(file,category,name) matches were
+    # summarized past a display cap — but every match was COUNTED (additional_matches
+    # is exact), nothing was left unassessed. That is aggregation, not incompleteness:
+    # mark AGGREGATED, not PARTIAL. PARTIAL is reserved for genuine gaps (surfaced via
+    # a real unreadable/unscanned signal, if/when discovery reports one).
+    completeness = COMPLETENESS_AGGREGATED if discovery.truncated else COMPLETENESS_COMPLETE
 
     if not discovery.has_ai_signal():
         return RiskAssessment(

@@ -183,7 +183,11 @@ def build_report(
     ai_inventory = {
         "categories": dict(sorted(by_category.items())),
         "truncated": [t.to_dict() for t in discovery.truncated],
-        "truncation_notice": "Discovery results were truncated; inventory may be incomplete." if discovery.truncated else None,
+        "truncation_notice": (
+            "Some files contained many repeated matches of the same pattern; these were "
+            "summarized with exact counts (see per-group totals). All matches were counted — "
+            "nothing was left unassessed."
+        ) if discovery.truncated else None,
     }
 
     # ---- Attack surface: all six buckets, always present -------------------
@@ -341,7 +345,11 @@ def build_report(
     # ---- Limitations -----------------------------------------------------
     limitations = list(_STANDARD_LIMITATIONS)
     if discovery.truncated:
-        limitations.append("Discovery results were truncated for this repository; findings, controls, risks, and readiness evidence may all be incomplete as a result.")
+        limitations.append(
+            "Some files contained many repeated matches of the same pattern; the report lists "
+            "representative findings plus an exact count of the remainder (see the evidence "
+            "appendix). All matches were counted — this is summarization, not an incomplete scan."
+        )
     for lim in readiness.limitations:
         if lim not in limitations:
             limitations.append(lim)
@@ -420,8 +428,11 @@ def render_text(report: VibeExplainerReport) -> str:
     level_display = f"Level {level} — {_LEVEL_DISPLAY.get(level, es['readiness_name'])}" if level else es["readiness_name"]
     add(f"READINESS\n{level_display}")
     if es["assessment_completeness"] == "PARTIAL":
-        add("!! ASSESSMENT INCOMPLETE — discovery was truncated. Findings/risks below")
-        add("   are a lower bound, not a complete picture. Do not read as \"only N risks\".")
+        add("!! ASSESSMENT INCOMPLETE — some files could not be assessed. Findings/risks")
+        add("   below are a lower bound. Do not read as \"only N risks\".")
+    elif es["assessment_completeness"] == "AGGREGATED":
+        add("(Some files had many repeated matches; these were summarized with exact")
+        add(" counts. The assessment is complete — see the evidence appendix for totals.)")
     add("")
     add(sep)
 

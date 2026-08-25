@@ -172,9 +172,10 @@ class TestLimitations(unittest.TestCase):
             report = _report(fixture)
             self.assertTrue(report.limitations)
 
-    def test_truncation_limitation_added_when_truncated(self):
+    def test_aggregation_limitation_added_when_truncated(self):
+        # summarized-repetition limitation is present and framed as counted, not lost
         report = _report("truncation-heavy")
-        self.assertTrue(any("truncated" in lim for lim in report.limitations))
+        self.assertTrue(any("repeated matches" in lim or "summariz" in lim for lim in report.limitations))
 
 
 class TestSecretRedaction(unittest.TestCase):

@@ -82,10 +82,16 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         "high-severity risk while showing an early-stage readiness level, or vice versa.")
     add("")
     if m["assessment_completeness"] == "PARTIAL":
-        add("> ⚠️ **This assessment is INCOMPLETE.** Discovery results were truncated, which "
-            "means the scanner stopped enumerating some repeated findings. The counts below "
-            "are a **lower bound** — the correct reading is *\"at least this many\"*, never "
-            "*\"only this many.\"* A full assessment requires re-running without truncation.")
+        add("> ⚠️ **This assessment is INCOMPLETE.** Some files could not be assessed, so the "
+            "counts below are a **lower bound** — the correct reading is *\"at least this many\"*, "
+            "never *\"only this many.\"* A full assessment requires resolving the gaps noted in "
+            "Limitations.")
+        add("")
+    elif m["assessment_completeness"] == "AGGREGATED":
+        add("> **Note:** Some files contained many repeated references to the same component "
+            "(e.g. a data-dense retrieval module). These were summarized with **exact counts** — "
+            "every match was counted; see the Evidence Appendix for per-group totals. The "
+            "assessment is complete.")
         add("")
     add("---")
     add("")

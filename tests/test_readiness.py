@@ -157,9 +157,9 @@ class TestFalsePositiveProtection(unittest.TestCase):
 
 
 class TestTruncatedDiscovery(unittest.TestCase):
-    def test_completeness_partial_when_discovery_truncated(self):
+    def test_completeness_aggregated_when_discovery_truncated(self):
         *_, readiness = _full_assess("truncation-heavy")
-        self.assertEqual(readiness.assessment_completeness, "PARTIAL")
+        self.assertEqual(readiness.assessment_completeness, "AGGREGATED")
 
 
 class TestEvidenceTypes(unittest.TestCase):

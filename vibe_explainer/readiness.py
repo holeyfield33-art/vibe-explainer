@@ -32,7 +32,7 @@ from .controls import (
     ControlAssessment,
 )
 from .dataflow import DataFlowGraph
-from .risk import COMPLETENESS_PARTIAL, RiskAssessment
+from .risk import COMPLETENESS_AGGREGATED, COMPLETENESS_PARTIAL, RiskAssessment
 from .scanner import SKIP_DIRS
 
 STATUS_ACHIEVED = "ACHIEVED"
@@ -282,7 +282,7 @@ def assess_readiness(
     multiplied together.
     """
     root = discovery.root
-    completeness = COMPLETENESS_PARTIAL if discovery.truncated else risks.assessment_completeness
+    completeness = COMPLETENESS_AGGREGATED if discovery.truncated else risks.assessment_completeness
 
     if not discovery.has_ai_signal():
         return ReadinessAssessment(
