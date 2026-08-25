@@ -1,0 +1,15 @@
+name: Security Evaluation
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run adversarial security tests
+        run: pytest tests/security
