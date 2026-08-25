@@ -162,9 +162,17 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("ai_usage", "LangChain", re.compile(r"\b(?:import\s+langchain|from\s+langchain)"), "high"),
     ("ai_usage", "LlamaIndex", re.compile(r"\b(?:import\s+llama_index|from\s+llama_index)"), "high"),
     ("ai_usage", "Agent framework", re.compile(r"\b(?:AgentExecutor|create_agent|initialize_agent)\("), "moderate"),
+    # TS/JS idioms — modern apps call models via raw fetch to the provider endpoint
+    # or via the Vercel AI SDK, not the Python-style SDK. These are the highest-value
+    # additions found on the creator-ai-hub validation run.
+    ("ai_usage", "OpenAI-compatible HTTP endpoint", re.compile(r"api\.openai\.com/v1|/v1/chat/completions|/chat/completions\b"), "high"),
+    ("ai_usage", "Whisper transcription endpoint", re.compile(r"\bwhisper-1\b|/audio/transcriptions\b"), "high"),
+    ("ai_usage", "Vercel AI SDK call", re.compile(r"\b(?:generateText|streamText|generateObject|streamObject)\s*\(|@ai-sdk/"), "high"),
+    ("ai_usage", "Chat messages array", re.compile(r"\bmessages\s*:\s*\[\s*\{\s*role\s*:"), "moderate"),
     # --- PROMPT SURFACES ----------------------------------------------------
     ("prompt_surface", "System prompt variable", re.compile(r"\b(?:SYSTEM_PROMPT|system_prompt|systemPrompt)\b\s*[:=]"), "high"),
     ("prompt_surface", "Prompt template", re.compile(r"\bPromptTemplate\(|prompt_template\s*[:=]"), "moderate"),
+    ("prompt_surface", "Chat role message", re.compile(r"\brole\s*:\s*['\"](?:system|user|assistant)['\"]"), "moderate"),
     ("prompt_surface", "Generic prompt variable", re.compile(r"\b(?:prompt|PROMPT)\b\s*[:=]\s*(?:f?[\"'])"), "low"),
     # --- RAG / RETRIEVAL ----------------------------------------------------
     ("rag_retrieval", "Pinecone", re.compile(r"\bpinecone\b", re.IGNORECASE), "high"),
@@ -195,7 +203,7 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("external_integration", "SQL database client", re.compile(r"\b(?:psycopg2|sqlalchemy|pymongo)\b"), "moderate"),
     ("external_integration", "Redis client", re.compile(r"\bredis\.(?:Redis|StrictRedis)\("), "moderate"),
     # --- SECRETS / CONFIGURATION -----------------------------------------
-    ("secret_config", "Model API key env var", re.compile(r"\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_KEY|HUGGINGFACE_TOKEN|COHERE_API_KEY|GOOGLE_API_KEY)\b"), "high"),
+    ("secret_config", "Model API key env var", re.compile(r"\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_KEY|HUGGINGFACE_TOKEN|COHERE_API_KEY|GOOGLE_API_KEY|AI_API_KEY|AI_MODEL|AI_BASE_URL)\b"), "high"),
     ("secret_config", "Possible hardcoded API key", re.compile(r"sk-[A-Za-z0-9_-]{20,}"), "high"),
     ("secret_config", "Generic API key reference", re.compile(r"\bAPI_KEY\b\s*[:=]"), "low"),
 ]
