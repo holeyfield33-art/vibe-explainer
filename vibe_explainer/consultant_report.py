@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any
 
+from . import playbook as _pb
 from .security_report import VibeExplainerReport
 
 _SEVERITY_LABEL = {"CRITICAL": "Critical", "HIGH": "High", "MODERATE": "Moderate", "LOW": "Low"}
@@ -37,7 +38,8 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Header -----------------------------------------------------------
     add("# AI Security Readiness Assessment")
     add("")
-    add("*Powered by Vibe Explainer*")
+    add("*Powered by Vibe Explainer — assessed against the HackerOne "
+        "\"Security for AI: Readiness and Risk Playbook\" framework.*")
     add("")
     add(f"- **Repository:** `{m['repository']}`")
     add(f"- **Assessment date:** {assessment_date or date.today().isoformat()}")
@@ -158,6 +160,15 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Key risks --------------------------------------------------------
     add("## Key Risks")
     add("")
+    add("Each scenario is scored with the playbook's AI Risk formula, "
+        f"`{_pb.RISK_FORMULA}`, on a 1–25 scale. Score bands map to severity and to the "
+        "readiness level the playbook associates with that risk:")
+    add("")
+    add("| Score | Severity | Playbook readiness |")
+    add("|---|---|---|")
+    for rng, sev, rd in _pb.risk_band_table_rows():
+        add(f"| {rng} | {sev} | {rd} |")
+    add("")
     dist = report.risks["by_severity"]
     add(f"**{report.risks['total']} scenario(s)** — "
         f"Critical: {dist.get('CRITICAL', 0)}, High: {dist.get('HIGH', 0)}, "
@@ -170,13 +181,15 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             add(f"- **Risk ID:** `{s['risk_id']}`")
             add(f"- **Category:** {s['category']}")
             add(f"- **Score:** {s['score']} / 25 ({s['severity']})")
+            # Playbook factor breakdown, shown as the formula with this scenario's inputs.
+            if s.get("exposure") is not None:
+                e, sa, se, lk = s["exposure"], s["safety_impact"], s["security_exposure"], s["likelihood"]
+                add(f"- **Risk factors (playbook):** Exposure {e}, Safety {sa}, "
+                    f"Security {se}, Likelihood {lk} → ROUND(((({e}+{sa}+{se})/3) × {lk})) = {s['score']}")
             if s.get("context_adjusted"):
                 add(f"- **Context adjustment:** severity capped — this scenario is driven "
                     f"entirely by `{s.get('primary_context', 'non-production')}` code, not "
                     f"production code. The raw score reflects the pattern as if in production.")
-            add(f"- **Factors:** Exposure {s.get('exposure', '-')}, Safety {s.get('safety_impact', '-')}, "
-                f"Security {s.get('security_exposure', '-')}, Likelihood {s.get('likelihood', '-')}"
-                if 'exposure' in s else f"- **Confidence:** {s['confidence']}")
             add(f"- **Assessment confidence:** {s['confidence']}")
             add("")
             add(f"{s['rationale']}")
@@ -197,10 +210,12 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Security controls ------------------------------------------------
     add("## Security Controls")
     add("")
-    add("Evidence of security controls found in the repository. **DETECTED** means supporting "
-        "evidence was found — not that the control is complete, effective, or resistant to "
-        "bypass. **NOT_DETECTED** means no supporting evidence was found — not that the control "
-        "definitely does not exist (it may live outside this repository).")
+    add("Evidence of security controls found in the repository, classified by the playbook's "
+        "control taxonomy — **[P] Preventive**, **[V] Validation**, **[G] Governance**. "
+        "**DETECTED** means supporting evidence was found — not that the control is complete, "
+        "effective, or resistant to bypass. **NOT_DETECTED** means no supporting evidence was "
+        "found — not that the control definitely does not exist (it may live outside this "
+        "repository).")
     add("")
     by_status = report.controls["by_status"]
     for status in _CONTROL_STATUS_ORDER:
@@ -209,10 +224,11 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             continue
         add(f"### {status.replace('_', ' ').title()}")
         add("")
-        add("| Control | Confidence | Rationale |")
-        add("|---|---|---|")
+        add("| Class | Control | Confidence | Rationale |")
+        add("|---|---|---|---|")
         for c in sorted(controls, key=lambda c: c["control_id"]):
-            add(f"| {c['control_id']} {c['name']} | {c['confidence']} | {_cell(c['rationale'])} |")
+            cls = _pb.control_class(c["control_id"])
+            add(f"| [{cls}] | {c['control_id']} {c['name']} | {c['confidence']} | {_cell(c['rationale'])} |")
         add("")
     add("---")
     add("")
@@ -220,19 +236,30 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Readiness --------------------------------------------------------
     add("## AI Security Readiness")
     add("")
-    add(f"**Current level: Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**")
+    add("Assessed against the four-level AI Security Readiness model from the HackerOne "
+        "*Security for AI: Readiness and Risk Playbook* (Baseline → Managed → Hardened → "
+        "Continuous).")
     add("")
+    lvl_meta = _pb.level_meta(level)
+    add(f"**Current level: Level {level} — {lvl_meta['name']}**")
+    add("")
+    if lvl_meta["goal"]:
+        add(f"- **Level goal (playbook):** {lvl_meta['goal']}")
+        add(f"- **Testing posture:** {lvl_meta['posture']}")
+        add(f"- **Typical platform at this level:** {_pb.platform_archetype(level)}")
+        add("")
     blocked = report.readiness.get("blocked_from_next_level")
     if blocked:
         add(f"**Blocked from the next level by:** {blocked}")
         add("")
-    add("| Level | Name | Status | Notes |")
-    add("|---|---|---|---|")
+    add("| Level | Name | Playbook goal | Status | Notes |")
+    add("|---|---|---|---|---|")
     for la in report.readiness["level_assessments"]:
         note = ""
         if la["status"] != "ACHIEVED" and la["missing_requirements"]:
             note = la["missing_requirements"][0]
-        add(f"| {la['level']} | {_LEVEL_NAME.get(la['level'], la['name'])} | {la['status']} | {_cell(note)} |")
+        meta = _pb.level_meta(la["level"])
+        add(f"| {la['level']} | {meta['name']} | {_cell(meta['goal'])} | {la['status']} | {_cell(note)} |")
     add("")
     add("---")
     add("")

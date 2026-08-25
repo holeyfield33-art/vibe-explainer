@@ -265,12 +265,18 @@ def build_report(
                 "category": s.category,
                 "score": s.score,
                 "severity": s.severity,
+                "exposure": s.exposure,
+                "safety_impact": s.safety_impact,
+                "security_exposure": s.security_exposure,
+                "likelihood": s.likelihood,
                 "confidence": s.confidence,
                 "rationale": _redact_check(s.rationale),
                 "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in s.evidence],
                 "related_finding_ids": s.related_finding_ids,
                 "related_dataflow_ids": s.related_dataflow_ids,
                 "related_control_ids": s.related_control_ids,
+                "primary_context": s.primary_context,
+                "context_adjusted": s.context_adjusted,
             }
             for s in sorted_scenarios
         ],
