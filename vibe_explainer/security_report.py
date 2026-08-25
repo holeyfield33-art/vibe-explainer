@@ -16,6 +16,9 @@ from . import __version__
 from .ai_discovery import DiscoveryResult
 from .attack_surface import BUCKETS, AttackSurfaceResult
 from .context_classifier import CONTEXT_PRODUCTION, classify_path
+
+# Fine-grained contexts (Phase 8) that count as production-relevant in the report.
+_PRODUCTION_RELEVANT_REPORT_CONTEXTS = frozenset({"PRODUCTION", "CONFIGURATION", "UNKNOWN"})
 from .controls import ControlAssessment
 from .dataflow import DataFlowGraph
 from .readiness import NO_AI_SURFACE, ReadinessAssessment
@@ -135,9 +138,9 @@ def build_report(
     context_counts: dict[str, int] = {}
     production_findings = 0
     for f in discovery.findings:
-        ctx = classify_path(f.file)
+        ctx = getattr(f, "context", None) or classify_path(f.file)
         context_counts[ctx] = context_counts.get(ctx, 0) + 1
-        if ctx == CONTEXT_PRODUCTION:
+        if ctx in _PRODUCTION_RELEVANT_REPORT_CONTEXTS:
             production_findings += 1
 
     if not ai_surface_detected:
@@ -172,7 +175,7 @@ def build_report(
                 "name": f.name,
                 "evidence": _redact_check(f.evidence),
                 "confidence": f.confidence,
-                "context": classify_path(f.file),
+                "context": getattr(f, "context", None) or classify_path(f.file),
             }
         )
     for items in by_category.values():
@@ -195,7 +198,7 @@ def build_report(
                 "confidence": i.confidence,
                 "finding_id": i.finding_id,
                 "security_relevance": i.security_relevance,
-                "context": classify_path(i.file),
+                "context": getattr(i, "context", None) or classify_path(i.file),
             }
             for i in sorted(by_bucket[b], key=lambda i: (i.file, i.line, i.finding_id))
         ]

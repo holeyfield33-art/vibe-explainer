@@ -157,6 +157,10 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             add(f"- **Risk ID:** `{s['risk_id']}`")
             add(f"- **Category:** {s['category']}")
             add(f"- **Score:** {s['score']} / 25 ({s['severity']})")
+            if s.get("context_adjusted"):
+                add(f"- **Context adjustment:** severity capped — this scenario is driven "
+                    f"entirely by `{s.get('primary_context', 'non-production')}` code, not "
+                    f"production code. The raw score reflects the pattern as if in production.")
             add(f"- **Factors:** Exposure {s.get('exposure', '-')}, Safety {s.get('safety_impact', '-')}, "
                 f"Security {s.get('security_exposure', '-')}, Likelihood {s.get('likelihood', '-')}"
                 if 'exposure' in s else f"- **Confidence:** {s['confidence']}")
