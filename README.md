@@ -1,91 +1,130 @@
-# vibe-explainer
+# Vibe Explainer
 
-**Make vibe-coded projects understandable — even when the original developer no longer understands them.**
+**Static AI security readiness assessment for any repository.**
 
-Point it at a repo. Get a short mental-model report: what the project is, how the pieces fit, which files to open first, and where the opacity risk is highest.
-
-Complements [vibe-check](https://github.com/holeyfield33-art/vibe-check):
-- **vibe-check** → “What smells / how carefully should a human look?”
-- **vibe-explainer** → “Here’s the map so a human can look productively.”
+Point it at a codebase and get a structured, evidence-backed assessment of its AI
+security posture: what AI components exist, what attack surface they create, how data
+and capability flow between them, which security controls are present, what risks that
+evidence represents, and how mature the repository's demonstrated security practice is —
+scored against a four-level readiness model.
 
 ```bash
-python -m vibe_explainer /path/to/repo
+python -m vibe_explainer /path/to/repo --security             # human-readable summary
+python -m vibe_explainer /path/to/repo --security --json      # full machine-readable assessment
+python -m vibe_explainer /path/to/repo --security --consultant # consultant-grade Markdown report
+```
+
+Everything runs **offline and deterministically** — Python stdlib only, no API keys, no
+network, same repo in, same assessment out.
+
+> **What this is, and what it is not.** Vibe Explainer performs *static, evidence-based*
+> analysis. It reports what the repository's own code and configuration demonstrate. It
+> does **not** execute the application, prove exploitability, or replace adversarial
+> testing or a manual security review. Every conclusion it prints traces back to a
+> specific finding, data-flow observation, or control — that evidence chain is the point.
+
+---
+
+## The assessment pipeline
+
+Each stage consumes the previous one; nothing is re-scanned or re-scored downstream.
+
+```
+Repository
+   |  AI discovery          - model providers, prompt surfaces, RAG, tools, MCP, secrets...
+   |  Attack surface        - six buckets: inputs, model, retrieval, tools, outputs, storage
+   |  Data flow             - same-file, evidence-based relationships between components
+   |  Security controls     - 12 controls, DETECTED / PARTIAL / NOT_DETECTED / NOT_APPLICABLE
+   |  Risk scenarios        - four-factor scoring (Exposure . Safety . Security . Likelihood)
+   |  Readiness             - Level 1 Baseline -> 4 Continuous, independent of risk severity
+   |  Report                - executive summary, evidence appendix, prioritized remediations
+```
+
+### What each stage promises — and refuses to claim
+
+- **Discovery** finds AI-relevant code by content, tagging every finding with
+  `file:line`, the matched evidence, and a confidence level. It never treats a keyword as
+  proof.
+- **Controls** report *evidence of a control*, never that a control is complete or
+  effective. `NOT_DETECTED` means "no supporting evidence was found here" — **not** "this
+  control does not exist" (it may live outside the repository).
+- **Risk** scores the concern represented by the evidence. It never claims a path is
+  exploitable — every scenario rationale says so explicitly.
+- **Readiness** measures *demonstrated process maturity*, and is deliberately independent
+  of risk severity. A repo can carry a high-severity risk at an early readiness level, or
+  vice versa. Running Vibe Explainer on a repo does not itself raise that repo's readiness.
+
+## Context awareness
+
+A real AI repository contains the same strings in production code, test fixtures, demo
+payloads, generated manifests, and documentation. Vibe Explainer labels every finding by
+**context** — `Production`, `Test`, `Example`, `Documentation`, or `Generated` — so a
+genuine production surface is never buried under thirty test-fixture matches of the same
+pattern. The executive summary reports how many findings are in production code versus
+everything else, and the consultant report lists production surface first.
+
+## Output modes
+
+| Mode | Flag | Use |
+|------|------|-----|
+| Terminal summary | `--security` | Quick read: surface, top risks, readiness, blockers, recommendations |
+| Full JSON | `--security --json` | Machine-readable; complete assessment with every ID for traceability |
+| Consultant report | `--security --consultant` | Professional Markdown deliverable with an evidence appendix |
+
+Exit codes are for tool status only: `0` = assessment completed (even with HIGH/CRITICAL
+findings — a finding is a result, not a crash), `1` = analysis error, `2` = usage error.
+
+## Honesty guarantees
+
+- **Truncation is loud.** If discovery is truncated on a large repo, the assessment is
+  marked `PARTIAL` and the report states plainly that counts are a lower bound — never
+  "only N risks."
+- **Secrets are redacted.** Any credential-shaped value is replaced with `[REDACTED]`
+  everywhere in every output, enforced at the serialization boundary.
+- **No manufactured findings.** A repo with no AI surface reports exactly that — not a
+  fabricated "LOW risk / Level 1 / looks secure."
+- **Every claim is traceable.** Attack-surface rows, risk scenarios, and recommendations
+  all reference the finding / data-flow / control IDs they derive from.
+
+## Legacy mode: repository mental model
+
+The original orientation report is still available (default mode, no `--security`): a short
+"what is this repo and where do I start" map, optionally grounded in a
+[vibe-check](https://github.com/holeyfield33-art/vibe-check) report.
+
+```bash
+python -m vibe_explainer /path/to/repo                          # mental-model report
 python -m vibe_explainer /path/to/repo --vibe-check-report report.json
-python -m vibe_explainer /path/to/repo --offline --out EXPLAIN.md
 ```
 
-## Why this exists
+## Where it sits in the toolchain
 
-Vibe-coded projects often ship with:
-- Little or no real documentation of *intent*
-- Chaotic or AI-shaped structure
-- An original author who can no longer explain the design
+Vibe Explainer is one of three composable static-analysis tools, each answering a
+different question about a repository:
 
-Existing tools do search, diagrams, or chat-with-codebase. Few are optimized for the specific failure mode: **the person who prompted this into existence has no mental model left either**.
+```
+vibe-check       -> Is this code itself trustworthy?   (AI-generated / rushed-code signals)
+vibe-explainer   -> Is its AI security posture sound?  (this tool)
+Lie Detector     -> Do its README claims hold up?      (executable claim verification)
+```
 
-vibe-explainer produces a *readable* artifact a stranger (or future you) can use in the first five minutes.
-
-## What it produces (v1)
-
-1. **Overview** — one short paragraph of what this appears to be
-2. **Architecture sketch** — Mermaid (or ASCII fallback) of main components / flows
-3. **Start-here guide** — ordered list of the most important files to open first, with one-line reasons
-4. **Key-file summaries** — plain-English intent for the highest-value files
-5. **Risk & opacity notes** — densest / least documented / most duplicated areas (grounds in a vibe-check report when provided)
-6. **Suggested first questions** — natural questions a newcomer might ask the codebase
-
-The report is deliberately short. The goal is orientation, not a generated wiki.
-
-## Modes
-
-| Mode | Behavior | Dependencies |
-|------|----------|--------------|
-| `--offline` | File tree, entry-point detection, basic structure heuristics, optional vibe-check integration | None (stdlib) |
-| LLM-assisted (default when configured) | Offline pass + narrative, prioritization, and architecture synthesis | API key or local model |
-| Hybrid | Deterministic structure first; LLM only for the human-readable layers | Both |
-
-## Relationship to vibe-check
+## Development
 
 ```bash
-# 1. Triage
-python vibe_check.py /path/to/repo --out report.json
-
-# 2. Orient
-python -m vibe_explainer /path/to/repo --vibe-check-report report.json --out EXPLAIN.md
+python -m unittest discover -s tests        # full suite
+python -m vibe_explainer examples/sample-vibe-project --security
 ```
 
-When a vibe-check report is supplied, risk notes and prioritization become grounded in real findings (syntax, duplicates, dead code, package risks, etc.) instead of pure guesswork.
+Architecture and per-stage methodology are documented in `docs/` (`PHASE-1`...`PHASE-7`,
+`CONSULTANT-REPORT.md`).
 
-## Status
+## Design principles
 
-**Early scaffold.** Offline structural pass and report skeleton are in place. LLM layer, richer language support, and interactive HTML tour are next.
-
-See [SPEC.md](SPEC.md) for the full product specification.
-
-## Quick start (development)
-
-```bash
-cd vibe-explainer
-python -m vibe_explainer examples/sample-vibe-project --offline
-python -m vibe_explainer examples/sample-vibe-project --offline --out /tmp/explain.md
-```
-
-## Design principles (inherited from vibe-check)
-
-- Prefer offline / deterministic where possible
-- Be honest about limitations and coverage
-- Produce something a human actually reads
-- Stay small enough that the tool itself is understandable
-- Never pretend a zero means more than what was actually checked
-
-## Part of the Aletheia toolchain
-
-```
-Aletheia portfolio auditor  → which repos need attention
-vibe-check                 → what’s wrong / triage disposition
-vibe-explainer             → here’s the map so a human can look productively
-Lie Detector               → does the repo do what it claims
-```
+- Offline and deterministic wherever possible
+- Report evidence, never assert exploitability or effectiveness
+- Distinguish "not detected" from "does not exist" from "not applicable"
+- Keep risk (how concerning) and readiness (how mature) strictly separate
+- Be loud about limitations, truncation, and what wasn't checked
 
 ## License
 

@@ -15,6 +15,7 @@ from typing import Any
 from . import __version__
 from .ai_discovery import DiscoveryResult
 from .attack_surface import BUCKETS, AttackSurfaceResult
+from .context_classifier import CONTEXT_PRODUCTION, classify_path
 from .controls import ControlAssessment
 from .dataflow import DataFlowGraph
 from .readiness import NO_AI_SURFACE, ReadinessAssessment
@@ -105,6 +106,18 @@ def build_report(
     if risks.scenarios:
         highest_severity = min(risks.scenarios, key=lambda s: _SEVERITY_ORDER.get(s.severity, 99)).severity
 
+    # Context breakdown: how much of the discovered surface is production code vs
+    # test/example/doc/generated content. This is the key signal the first
+    # real-world run (aletheia-core) showed was missing — a production webhook and
+    # a test-fixture string were indistinguishable in the report.
+    context_counts: dict[str, int] = {}
+    production_findings = 0
+    for f in discovery.findings:
+        ctx = classify_path(f.file)
+        context_counts[ctx] = context_counts.get(ctx, 0) + 1
+        if ctx == CONTEXT_PRODUCTION:
+            production_findings += 1
+
     if not ai_surface_detected:
         statement = "No AI security assessment was generated because no AI surface was detected."
     else:
@@ -120,6 +133,9 @@ def build_report(
         "readiness_level": readiness.readiness_level,
         "readiness_name": readiness.readiness_name,
         "assessment_completeness": readiness.assessment_completeness,
+        "total_findings": len(discovery.findings),
+        "production_findings": production_findings,
+        "findings_by_context": dict(sorted(context_counts.items())),
         "statement": statement,
     }
 
@@ -134,6 +150,7 @@ def build_report(
                 "name": f.name,
                 "evidence": _redact_check(f.evidence),
                 "confidence": f.confidence,
+                "context": classify_path(f.file),
             }
         )
     for items in by_category.values():
@@ -156,6 +173,7 @@ def build_report(
                 "confidence": i.confidence,
                 "finding_id": i.finding_id,
                 "security_relevance": i.security_relevance,
+                "context": classify_path(i.file),
             }
             for i in sorted(by_bucket[b], key=lambda i: (i.file, i.line, i.finding_id))
         ]
@@ -363,6 +381,10 @@ def render_text(report: VibeExplainerReport) -> str:
         _render_limitations(add, report)
         return "\n".join(lines)
 
+    add(f"FINDINGS\n{es['total_findings']} total "
+        f"({es['production_findings']} in production code, "
+        f"{es['total_findings'] - es['production_findings']} in test/example/docs/generated)")
+    add("")
     add(f"RISKS\n{es['risk_scenario_count']} scenario(s)")
     add(f"Highest: {es['highest_risk_severity'] or 'none'}")
     add("")
@@ -370,7 +392,8 @@ def render_text(report: VibeExplainerReport) -> str:
     level_display = f"Level {level} — {_LEVEL_DISPLAY.get(level, es['readiness_name'])}" if level else es["readiness_name"]
     add(f"READINESS\n{level_display}")
     if es["assessment_completeness"] == "PARTIAL":
-        add("(assessment PARTIAL — discovery results were truncated)")
+        add("!! ASSESSMENT INCOMPLETE — discovery was truncated. Findings/risks below")
+        add("   are a lower bound, not a complete picture. Do not read as \"only N risks\".")
     add("")
     add(sep)
 

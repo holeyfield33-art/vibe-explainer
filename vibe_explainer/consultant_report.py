@@ -68,6 +68,11 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         + (f", the highest of which is rated **{_SEVERITY_LABEL.get(highest, highest)}**." if highest else ".")
         )
     add("")
+    add(f"Of **{es['total_findings']}** AI-relevant findings, **{es['production_findings']}** "
+        f"are in production code; the remainder are in test, example, documentation, or "
+        f"generated content. Findings are labelled by context throughout this report so "
+        f"production surface can be distinguished from research and test material.")
+    add("")
     add(f"The repository's demonstrated AI security readiness is assessed as "
         f"**Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**.")
     add("")
@@ -77,8 +82,10 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         "high-severity risk while showing an early-stage readiness level, or vice versa.")
     add("")
     if m["assessment_completeness"] == "PARTIAL":
-        add("> **Note:** This assessment is marked **PARTIAL** because discovery results were "
-            "truncated. The findings below may be incomplete.")
+        add("> ⚠️ **This assessment is INCOMPLETE.** Discovery results were truncated, which "
+            "means the scanner stopped enumerating some repeated findings. The counts below "
+            "are a **lower bound** — the correct reading is *\"at least this many\"*, never "
+            "*\"only this many.\"* A full assessment requires re-running without truncation.")
         add("")
     add("---")
     add("")
@@ -87,7 +94,10 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("## AI Attack Surface")
     add("")
     add("AI-relevant components discovered in the repository, grouped by the surface they "
-        "belong to. Each item references the finding it was derived from.")
+        "belong to. Each item references the finding it was derived from and is labelled by "
+        "**context** — Production, Test, Example, Documentation, or Generated — so a genuine "
+        "production surface can be told apart from test fixtures, demo payloads, and generated "
+        "manifests that happen to contain the same strings. Production findings are listed first.")
     add("")
     surface = report.attack_surface
     any_surface = False
@@ -98,10 +108,12 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         any_surface = True
         add(f"### {bucket.capitalize()}")
         add("")
-        add("| Component | Location | Confidence | Evidence | Finding |")
-        add("|---|---|---|---|---|")
-        for i in items:
-            add(f"| {i['component']} | `{i['file']}:{i['line']}` | {i['confidence']} | "
+        add("| Component | Context | Location | Confidence | Evidence | Finding |")
+        add("|---|---|---|---|---|---|")
+        # production surface first, then test/example/doc/generated
+        ordered = sorted(items, key=lambda i: (0 if i.get("context") == "PRODUCTION" else 1, i["file"], i["line"]))
+        for i in ordered:
+            add(f"| {i['component']} | {i.get('context', 'PRODUCTION').title()} | `{i['file']}:{i['line']}` | {i['confidence']} | "
                 f"{_cell(i['evidence'])} | `{i['finding_id']}` |")
         add("")
     if not any_surface:
