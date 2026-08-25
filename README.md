@@ -8,6 +8,11 @@ and capability flow between them, which security controls are present, what risk
 evidence represents, and how mature the repository's demonstrated security practice is —
 scored against a four-level readiness model.
 
+The risk scoring and readiness levels are aligned to the **HackerOne "Security for AI:
+Readiness and Risk Playbook"** framework (four-factor risk scoring, four readiness
+levels from Baseline to Continuous, and a Preventive / Validation / Governance control
+taxonomy), so the output maps to vocabulary security teams already recognize.
+
 ```bash
 python -m vibe_explainer /path/to/repo --security             # human-readable summary
 python -m vibe_explainer /path/to/repo --security --json      # full machine-readable assessment
@@ -89,23 +94,12 @@ findings — a finding is a result, not a crash), `1` = analysis error, `2` = us
 ## Legacy mode: repository mental model
 
 The original orientation report is still available (default mode, no `--security`): a short
-"what is this repo and where do I start" map, optionally grounded in a
-[vibe-check](https://github.com/holeyfield33-art/vibe-check) report.
+"what is this repo and where do I start" map, optionally grounded in an external
+code-quality report.
 
 ```bash
 python -m vibe_explainer /path/to/repo                          # mental-model report
 python -m vibe_explainer /path/to/repo --vibe-check-report report.json
-```
-
-## Where it sits in the toolchain
-
-Vibe Explainer is one of three composable static-analysis tools, each answering a
-different question about a repository:
-
-```
-vibe-check       -> Is this code itself trustworthy?   (AI-generated / rushed-code signals)
-vibe-explainer   -> Is its AI security posture sound?  (this tool)
-Lie Detector     -> Do its README claims hold up?      (executable claim verification)
 ```
 
 ## Development
@@ -128,4 +122,4 @@ Architecture and per-stage methodology are documented in `docs/` (`PHASE-1`...`P
 
 ## License
 
-MIT
+Apache License 2.0 — see [LICENSE](LICENSE).
