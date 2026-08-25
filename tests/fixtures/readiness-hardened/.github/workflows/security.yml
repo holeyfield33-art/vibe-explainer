@@ -1,0 +1,13 @@
+name: Security Evaluation
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run adversarial security tests
+        run: pytest tests/security
