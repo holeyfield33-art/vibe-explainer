@@ -165,5 +165,81 @@ class TestIdentityCollisionAcrossPatterns(unittest.TestCase):
         self.assertEqual(line2[0].confidence, "high")
 
 
+class TestEnvBasedCredentialReference(unittest.TestCase):
+    """Regression for C08 only recognizing a fixed provider-name allowlist
+    (OPENAI_API_KEY, ANTHROPIC_API_KEY, ...) plus a bare 'API_KEY' pattern
+    that requires the literal word boundary immediately before it. Neither
+    matched aegis-provenance's real, correctly-env-based credential:
+    AEGIS_EVAL_API_KEY via process.env (llm-eval.ts:679, real-model-asr.ts:285)."""
+
+    def test_custom_named_process_env_reference_detected(self):
+        result = discover_ai(FIXTURES / "controls-custom-env-secret")
+        names = _names(result.findings, "secret_config")
+        self.assertIn("Env-based credential reference", names)
+
+    def test_os_getenv_custom_token_name_detected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "config.py"
+            f.write_text('token = os.getenv("SOMETHING_TOKEN")\n')
+            result = discover_ai(Path(d))
+            names = _names(result.findings, "secret_config")
+            self.assertIn("Env-based credential reference", names)
+
+    def test_os_environ_get_custom_secret_name_detected(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "config.py"
+            f.write_text('secret = os.environ.get("SOMETHING_SECRET")\n')
+            result = discover_ai(Path(d))
+            names = _names(result.findings, "secret_config")
+            self.assertIn("Env-based credential reference", names)
+
+    def test_unrelated_env_vars_not_flagged(self):
+        # Negative case: common non-credential env vars must not fire the
+        # new pattern just because they're read via process.env/os.getenv.
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "server.ts"
+            f.write_text(
+                "const env = process.env.NODE_ENV;\n"
+                "const port = process.env.PORT;\n"
+            )
+            result = discover_ai(Path(d))
+            names = _names(result.findings, "secret_config")
+            self.assertNotIn("Env-based credential reference", names)
+
+    def test_unrelated_os_getenv_not_flagged(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            f = Path(d) / "settings.py"
+            f.write_text('debug = os.getenv("DEBUG")\nport = os.getenv("PORT")\n')
+            result = discover_ai(Path(d))
+            names = _names(result.findings, "secret_config")
+            self.assertNotIn("Env-based credential reference", names)
+
+    def test_fixed_provider_name_pattern_still_works_unchanged(self):
+        # Regression: the existing fixed-provider-name case (basic-chatbot's
+        # os.environ["OPENAI_API_KEY"]) must still be detected exactly as
+        # before — this fix is additive, not a replacement.
+        result = discover_ai(FIXTURES / "basic-chatbot")
+        self.assertIn("Model API key env var", _names(result.findings, "secret_config"))
+
+    def test_pattern_does_not_self_match_its_own_definition(self):
+        # Self-referential-FP guard: running discovery over vibe_explainer's
+        # own source must not have the new pattern match its own regex
+        # pattern-definition string in ai_discovery.py (analogous to how
+        # _SIGNATURE_PRONE_NAMES keeps eval/exec patterns from flagging
+        # their own source).
+        package_root = Path(__file__).resolve().parents[1] / "vibe_explainer"
+        result = discover_ai(package_root)
+        self_matches = [
+            f
+            for f in result.findings
+            if f.name == "Env-based credential reference" and f.file == "ai_discovery.py"
+        ]
+        self.assertEqual(self_matches, [])
+
+
 if __name__ == "__main__":
     unittest.main()

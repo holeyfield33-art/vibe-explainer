@@ -218,6 +218,21 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ("secret_config", "Model API key env var", re.compile(r"\b(?:OPENAI_API_KEY|ANTHROPIC_API_KEY|AZURE_OPENAI_KEY|HUGGINGFACE_TOKEN|COHERE_API_KEY|GOOGLE_API_KEY|AI_API_KEY|AI_MODEL|AI_BASE_URL)\b"), "high"),
     ("secret_config", "Possible hardcoded API key", re.compile(r"sk-[A-Za-z0-9_-]{20,}"), "high"),
     ("secret_config", "Generic API key reference", re.compile(r"\bAPI_KEY\b\s*[:=]"), "low"),
+    # Custom-named credential env vars (e.g. AEGIS_EVAL_API_KEY) that the fixed
+    # provider-name list and the bare-word "API_KEY" pattern both miss — this
+    # catches the access idiom (process.env./os.environ/os.getenv) rather than
+    # a specific name, independent of provider.
+    (
+        "secret_config",
+        "Env-based credential reference",
+        re.compile(
+            r"\bprocess\.env\.\w*(?:API_KEY|TOKEN|SECRET|CREDENTIAL)\w*\b"
+            r"|\bos\.environ(?:\.get)?\s*[\[\(]\s*['\"]\w*(?:API_KEY|TOKEN|SECRET|CREDENTIAL)\w*['\"]"
+            r"|\bos\.getenv\(\s*['\"]\w*(?:API_KEY|TOKEN|SECRET|CREDENTIAL)\w*['\"]",
+            re.IGNORECASE,
+        ),
+        "moderate",
+    ),
 ]
 
 

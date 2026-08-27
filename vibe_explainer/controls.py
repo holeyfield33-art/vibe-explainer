@@ -51,7 +51,7 @@ TOOL_LIKE_CATEGORIES = {"tool_agent", "mcp"}
 HIGH_RISK_TOOL_NAMES = {"Shell execution", "Dynamic code execution"}
 DB_EXTERNAL_NAMES = {"SQL database client", "Redis client"}
 HARDCODED_SECRET_NAME = "Possible hardcoded API key"
-ENV_SECRET_NAMES = {"Model API key env var", "Generic API key reference"}
+ENV_SECRET_NAMES = {"Model API key env var", "Generic API key reference", "Env-based credential reference"}
 
 DOC_EXTS = {".md", ".rst", ".txt"}
 
@@ -266,6 +266,32 @@ def _best_confidence(matches: list[_EvidenceMatch]) -> str:
     return "high" if any(m.confidence == "high" for m in matches) else "moderate"
 
 
+def _real(findings: list[AIFinding]) -> list[AIFinding]:
+    """Exclude "low"-confidence findings from a surface list used to gate a
+    control's N/A-vs-real-surface decision. Low confidence here means
+    ai_discovery.py itself already downgraded the match (comment/string-literal
+    context, or a bare keyword-only signal) — real, but not trustworthy enough
+    on its own to say the surface exists. Callers that need the un-filtered
+    list (e.g. to explain an N/A verdict) should keep a reference to it."""
+    return [f for f in findings if f.confidence != "low"]
+
+
+def _surface_absent_reason(raw: list[AIFinding], nothing_found_reason: str, surface_description: str) -> str:
+    """Rationale for an N/A verdict driven by a confidence-filtered surface list
+    (see `_real`). If raw findings existed but none survived the confidence
+    filter, say so explicitly — a reviewer needs to be able to tell "nothing
+    here" apart from "something here, but we don't trust it", rather than
+    both reading as an identical N/A."""
+    if raw and not _real(raw):
+        return (
+            f"{surface_description} evidence was found in this repository, but it was "
+            f"low-confidence only (e.g. a dangerous-call token appearing in a comment or "
+            f"string literal, not a live call) — not treated as establishing a real surface "
+            f"for this control."
+        )
+    return nothing_found_reason
+
+
 def _pattern_evidence_refs(matches: list[_EvidenceMatch], limit: int = 5) -> list[EvidenceRef]:
     ordered = sorted(matches, key=lambda m: (m.file, m.line, m.tag))[:limit]
     return [
@@ -328,8 +354,16 @@ def assess_controls(
     external_integration = by_category.get("external_integration", [])
     secret_config = by_category.get("secret_config", [])
 
-    tool_like = [f for f in tool_agent + mcp]
-    high_risk_tools = [f for f in tool_agent if f.name in HIGH_RISK_TOOL_NAMES]
+    # A "low"-confidence finding is one ai_discovery.py already flagged as
+    # likely noise (e.g. a dangerous-call token inside a comment/string
+    # literal — see _match_in_string_or_comment). It still belongs in the
+    # evidence appendix and attack-surface table, but must not, by itself,
+    # be enough to flip a control from N/A to NOT_DETECTED/PARTIAL/DETECTED.
+    tool_like_raw = tool_agent + mcp
+    high_risk_tools_raw = [f for f in tool_agent if f.name in HIGH_RISK_TOOL_NAMES]
+
+    tool_like = _real(tool_like_raw)
+    high_risk_tools = _real(high_risk_tools_raw)
     db_integrations = [f for f in external_integration if f.name in DB_EXTERNAL_NAMES]
 
     controls: list[SecurityControl] = []
@@ -479,7 +513,9 @@ def assess_controls(
 
     # ---- C05 — TOOL AUTHORIZATION ---------------------------------------
     if not tool_like:
-        controls.append(not_applicable("C05", "Tool Authorization", "TOOL_AUTHORIZATION", "No tool-invocation or MCP surface was discovered — there is nothing to authorize."))
+        controls.append(not_applicable("C05", "Tool Authorization", "TOOL_AUTHORIZATION", _surface_absent_reason(
+            tool_like_raw, "No tool-invocation or MCP surface was discovered — there is nothing to authorize.", "Tool-invocation/MCP",
+        )))
     else:
         matches = code_evidence.get("C05", [])
         covered = _findings_covered(matches, tool_like)
@@ -520,7 +556,9 @@ def assess_controls(
 
     # ---- C06 — HUMAN APPROVAL --------------------------------------------
     if not tool_like:
-        controls.append(not_applicable("C06", "Human Approval", "HUMAN_APPROVAL", "No tool-invocation or MCP surface was discovered — there is no high-impact AI action requiring approval."))
+        controls.append(not_applicable("C06", "Human Approval", "HUMAN_APPROVAL", _surface_absent_reason(
+            tool_like_raw, "No tool-invocation or MCP surface was discovered — there is no high-impact AI action requiring approval.", "Tool-invocation/MCP",
+        )))
     else:
         matches = code_evidence.get("C06", [])
         if matches:
@@ -530,7 +568,9 @@ def assess_controls(
 
     # ---- C07 — LOGGING / AUDITABILITY ------------------------------------
     if not ai_usage and not tool_like:
-        controls.append(not_applicable("C07", "Logging / Auditability", "LOGGING", "No AI usage or tool-invocation surface was discovered — there is no AI action to audit."))
+        controls.append(not_applicable("C07", "Logging / Auditability", "LOGGING", _surface_absent_reason(
+            tool_like_raw, "No AI usage or tool-invocation surface was discovered — there is no AI action to audit.", "Tool-invocation",
+        )))
     else:
         matches = code_evidence.get("C07", [])
         related = ai_usage + tool_like
@@ -614,7 +654,9 @@ def assess_controls(
 
     # ---- C12 — HIGH-RISK ACTION CONTROLS ---------------------------------
     if not high_risk_tools:
-        controls.append(not_applicable("C12", "High-Risk Action Controls", "HIGH_RISK_ACTIONS", "No shell-execution or dynamic-code-execution surface was discovered — there is no high-risk action to constrain."))
+        controls.append(not_applicable("C12", "High-Risk Action Controls", "HIGH_RISK_ACTIONS", _surface_absent_reason(
+            high_risk_tools_raw, "No shell-execution or dynamic-code-execution surface was discovered — there is no high-risk action to constrain.", "Shell-execution/dynamic-code-execution",
+        )))
     else:
         matches = code_evidence.get("C12", [])
         covered = _findings_covered(matches, high_risk_tools)

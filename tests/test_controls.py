@@ -201,6 +201,85 @@ class TestTraceability(unittest.TestCase):
                 self.assertIn(fid, finding_ids)
 
 
+class TestConfidenceFiltering(unittest.TestCase):
+    """Regression for the C05/C06/C07/C12 confidence-blindness bug: a single
+    'low'-confidence finding (ai_discovery.py's own comment/string-literal
+    downgrade) must not, by itself, drive a control to NOT_DETECTED/PARTIAL/
+    DETECTED. Live repro was aegis-provenance's attribution.ts:367, a comment
+    reading "a single exec() would only see the first..." — reproduced here
+    with a minimal fixture of the same shape."""
+
+    def test_real_high_confidence_tool_surface_still_not_detected(self):
+        # TP: agent-with-tools has a genuine @tool decorator and a real
+        # subprocess.run(..., shell=True) call — both high confidence. The
+        # confidence filter must not neuter this real detection: C05/C06/C12
+        # must still correctly report NOT_DETECTED (no auth/approval/
+        # sandboxing evidence found near a real tool-invocation surface).
+        assessment = _assess("agent-with-tools")
+        for control_id in ("C05", "C06", "C12"):
+            self.assertEqual(_control(assessment, control_id).status, STATUS_NOT_DETECTED, msg=control_id)
+
+    def test_real_high_confidence_tool_surface_with_auth_still_detected(self):
+        # TP: controls-tool-with-auth has the same high-confidence tool
+        # surface plus real authorization evidence — must still be DETECTED.
+        assessment = _assess("controls-tool-with-auth")
+        self.assertEqual(_control(assessment, "C05").status, STATUS_DETECTED)
+        self.assertEqual(_control(assessment, "C12").status, STATUS_DETECTED)
+
+    def test_comment_only_exec_does_not_drive_c05_not_detected(self):
+        # FP-regression: the ONLY tool_agent-shaped evidence in this fixture
+        # is "exec()" inside a `//` comment, which ai_discovery.py already
+        # downgrades to "low" confidence. Before the fix, controls.py ignored
+        # confidence and still called this NOT_DETECTED, generating a P1
+        # tool-authorization remediation for a surface that doesn't exist.
+        assessment = _assess("controls-low-confidence-comment-only")
+        c05 = _control(assessment, "C05")
+        self.assertEqual(c05.status, STATUS_NOT_APPLICABLE)
+        self.assertIn("low-confidence", c05.rationale)
+
+    def test_comment_only_exec_does_not_drive_c06_c07_c12_not_detected(self):
+        assessment = _assess("controls-low-confidence-comment-only")
+        for control_id in ("C06", "C07", "C12"):
+            control = _control(assessment, control_id)
+            self.assertEqual(control.status, STATUS_NOT_APPLICABLE, msg=control_id)
+            self.assertIn("low-confidence", control.rationale, msg=control_id)
+
+    def test_low_confidence_finding_still_traceable(self):
+        # Low-confidence findings are still real findings — they must still
+        # appear in discovery output, just not drive a control verdict.
+        discovery = discover_ai(FIXTURES / "controls-low-confidence-comment-only")
+        low_conf = [f for f in discovery.findings if f.confidence == "low"]
+        self.assertTrue(low_conf)
+
+    def test_na_rationale_distinguishes_low_confidence_from_nothing_found(self):
+        # An N/A driven by low-confidence-only evidence must read differently
+        # from an N/A driven by no evidence at all (e.g. basic-chatbot, which
+        # has no tool_agent/mcp findings whatsoever).
+        low_conf_assessment = _assess("controls-low-confidence-comment-only")
+        nothing_assessment = _assess("basic-chatbot")
+        low_conf_rationale = _control(low_conf_assessment, "C05").rationale
+        nothing_rationale = _control(nothing_assessment, "C05").rationale
+        self.assertEqual(_control(nothing_assessment, "C05").status, STATUS_NOT_APPLICABLE)
+        self.assertNotEqual(low_conf_rationale, nothing_rationale)
+
+
+class TestCustomEnvSecretDetection(unittest.TestCase):
+    """Regression for C08 only recognizing a fixed provider-name allowlist.
+    Live repro was aegis-provenance reading AEGIS_EVAL_API_KEY via
+    process.env — a real, correct secret-handling pattern the fixed
+    provider-name list and the bare 'API_KEY' pattern both missed."""
+
+    def test_custom_named_env_secret_detected(self):
+        assessment = _assess("controls-custom-env-secret")
+        c08 = _control(assessment, "C08")
+        self.assertEqual(c08.status, STATUS_DETECTED)
+
+    def test_custom_named_env_secret_traceable_to_finding(self):
+        discovery = discover_ai(FIXTURES / "controls-custom-env-secret")
+        names = {f.name for f in discovery.findings if f.category == "secret_config"}
+        self.assertIn("Env-based credential reference", names)
+
+
 class TestAllTwelveControlsPresent(unittest.TestCase):
     def test_twelve_controls_returned(self):
         assessment = _assess("basic-chatbot")
