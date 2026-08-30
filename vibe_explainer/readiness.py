@@ -20,6 +20,7 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -97,13 +98,21 @@ def _should_skip_dir(name: str) -> bool:
     return name in SKIP_DIRS
 
 
-def _iter_all_repo_paths(root_path: Path) -> list[Path]:
-    out: list[Path] = []
+def _iter_all_repo_paths(root_path: Path):
+    """Yield regular repository files without following file symlinks.
+
+    Streaming avoids retaining an attacker-controlled path list in memory. The
+    shared bounded reader performs a second no-follow check before content reads.
+    """
     for dirpath, dirnames, filenames in os.walk(root_path):
         dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
         for name in filenames:
-            out.append(Path(dirpath) / name)
-    return out
+            path = Path(dirpath) / name
+            try:
+                if stat.S_ISREG(path.lstat().st_mode):
+                    yield path
+            except OSError:
+                continue
 
 
 @dataclass

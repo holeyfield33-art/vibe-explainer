@@ -5,6 +5,11 @@ Phase 0–7 assessment as a consultant-grade Markdown deliverable a security
 professional can hand to a client. It makes **no changes to the analysis engine** —
 `consultant_report.py` is a pure function over an already-built `VibeExplainerReport`.
 
+> **Pre-release warning:** “Consultant-grade” describes formatting, not analytical
+> assurance. The engine remains an experimental regex/proximity evidence reporter.
+> Severities and readiness levels are not empirically calibrated, and reports require
+> manual validation before client use.
+
 ## Why it exists
 
 The valuable asset isn't the regex engine — it's the traceable assessment chain:
@@ -52,9 +57,20 @@ when the report is rendered.
 
 ## Secret redaction
 
-The renderer reads already-redacted fields from `VibeExplainerReport` (redaction is
-enforced at the Phase 7 serialization boundary), so no secret value can reach the
-Markdown. Verified by `TestConsultantReportRedaction` and a CLI-level leak check.
+The renderer reads already-redacted fields from `VibeExplainerReport`, and redaction
+is re-applied at the Phase 7 serialization boundary. Covered secret formats are
+verified by `TestConsultantReportRedaction` and CLI-level leak checks.
+
+Redaction is also applied when discovery captures evidence and recognizes sensitive
+assignments, credential-bearing URLs, private keys, JWTs, and common provider token
+formats. This remains defense-in-depth rather than a guarantee that every secret
+format is recognizable; reports must still be treated as sensitive.
+
+## Untrusted tree safety
+
+File symlinks and non-regular entries are excluded from content and process-evidence
+scans. Reads are bounded and use no-follow semantics where supported. Global file,
+byte, depth, and elapsed-time budgets remain future hardening work.
 
 ## Explicit non-goals
 

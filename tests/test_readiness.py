@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from pathlib import Path
 
 from vibe_explainer.ai_discovery import discover_ai
@@ -9,6 +10,7 @@ from vibe_explainer.readiness import (
     NO_AI_SURFACE,
     STATUS_ACHIEVED,
     STATUS_NOT_ACHIEVED,
+    _scan_process_signals,
     assess_readiness,
 )
 from vibe_explainer.risk import assess_risks
@@ -37,6 +39,21 @@ class TestNoAIRepository(unittest.TestCase):
         self.assertIsNone(readiness.readiness_level)
         self.assertEqual(readiness.readiness_name, NO_AI_SURFACE)
         self.assertEqual(readiness.level_assessments, [])
+
+
+class TestProcessScannerFilesystemSafety(unittest.TestCase):
+    def test_symlink_cannot_manufacture_process_evidence(self):
+        with tempfile.TemporaryDirectory() as root_dir, tempfile.TemporaryDirectory() as outside_dir:
+            root = Path(root_dir)
+            outside = Path(outside_dir) / "test_adversarial.py"
+            outside.write_text("assert True\n")
+            link = root / "tests" / "security" / "test_adversarial.py"
+            link.parent.mkdir(parents=True)
+            link.symlink_to(outside)
+
+            signals = _scan_process_signals(root)
+
+            self.assertEqual(signals.security_test_artifact, [])
 
 
 class TestBaselineLevel(unittest.TestCase):

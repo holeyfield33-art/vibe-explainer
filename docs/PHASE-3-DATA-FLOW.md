@@ -1,5 +1,9 @@
 # Phase 3 — Static AI Data-Flow Observation
 
+> **Validity warning:** Relationships remain same-file proximity associations. They
+> are not control-flow, def-use, import-graph, or taint-analysis results and require
+> manual validation before security decisions.
+
 ## 1. Purpose
 
 Connect the AI components `ai_discovery.py` already found into a lightweight graph of

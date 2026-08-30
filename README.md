@@ -58,7 +58,20 @@ When a vibe-check report is supplied, risk notes and prioritization become groun
 
 ## Status
 
-**Early scaffold.** Offline structural pass and report skeleton are in place. LLM layer, richer language support, and interactive HTML tour are next.
+**Experimental prototype — not production security assurance.** The repository
+contains both the original mental-model report and an experimental `--security`
+static evidence pipeline. The security pipeline uses regex and proximity heuristics;
+it does not prove exploitability, control effectiveness, compliance, or maturity.
+
+Current hardening guarantees:
+
+- local/offline analysis with no target-code execution;
+- file symlinks and non-regular files are skipped;
+- bounded file reads;
+- secret redaction at evidence and report boundaries; and
+- a 90% branch-coverage gate (currently 94% across the package).
+
+Reports remain potentially sensitive and should be reviewed before sharing.
 
 See [SPEC.md](SPEC.md) for the full product specification.
 
@@ -68,7 +81,27 @@ See [SPEC.md](SPEC.md) for the full product specification.
 cd vibe-explainer
 python -m vibe_explainer examples/sample-vibe-project --offline
 python -m vibe_explainer examples/sample-vibe-project --offline --out /tmp/explain.md
+python -m vibe_explainer tests/fixtures/basic-chatbot --security --json
+python -m unittest discover -s tests
+python -m coverage run -m unittest discover -s tests
+python -m coverage report
 ```
+
+The coverage commands require the development-only `coverage` package.
+
+## Security-mode limitations
+
+- Language coverage is uneven; detection is primarily shaped around Python forms.
+- Comments, strings, examples, tests, generated code, and production code are not
+  yet reliably distinguished.
+- Data-flow relationships are same-file line-proximity inferences, not control-flow
+  or taint analysis.
+- Numeric risk severities and readiness levels are deterministic policy outputs,
+  not empirically calibrated predictions.
+- A unified coverage ledger and scan-wide resource budgets remain unfinished.
+
+See [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and the open GitHub
+issues for the hardening backlog.
 
 ## Design principles (inherited from vibe-check)
 

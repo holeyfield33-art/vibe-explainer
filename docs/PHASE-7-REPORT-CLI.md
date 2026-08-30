@@ -1,5 +1,9 @@
 # Phase 7 — Report + CLI Product Integration
 
+> **Handling warning:** Reports are manually reviewable evidence artifacts, not
+> vulnerability findings or certifications. Secret redaction is defense-in-depth;
+> generated output should still be handled as potentially sensitive.
+
 ## 1. Report architecture
 
 ```

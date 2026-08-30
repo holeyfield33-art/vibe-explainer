@@ -1,5 +1,9 @@
 # Phase 6 — AI Security Readiness Assessment
 
+> **Gameability warning:** Levels are inferred from repository paths, headers, code
+> keywords, and CI text. The scanner does not prove that tests are substantive, CI is
+> enforced, or documented processes operate in practice.
+
 **Readiness measures demonstrated AI security maturity and repeatability. It is
 independent of the severity of individual risk scenarios.**
 

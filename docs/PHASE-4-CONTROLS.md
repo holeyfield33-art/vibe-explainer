@@ -1,5 +1,9 @@
 # Phase 4 — AI Security Control Assessment
 
+> **Validity warning:** Statuses describe lexical repository evidence only. They do
+> not prove that a guard executes, precedes a protected action, consumes an
+> authorization result, or resists bypass.
+
 **Control assessment identifies repository evidence of security controls. It does not
 prove that a control is complete, effective, or resistant to bypass.**
 

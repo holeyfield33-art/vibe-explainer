@@ -19,6 +19,7 @@ from .controls import ControlAssessment
 from .dataflow import DataFlowGraph
 from .readiness import NO_AI_SURFACE, ReadinessAssessment
 from .risk import RiskAssessment
+from .security_utils import redact_secrets
 
 _SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MODERATE": 2, "LOW": 3}
 _LEVEL_ORDER = (1, 2, 3, 4)
@@ -44,9 +45,7 @@ _STANDARD_LIMITATIONS = [
 def _redact_check(text: str) -> str:
     """Defense-in-depth: Phase 5 already redacts secret values in risk evidence; this
     re-applies the same pattern to any report-level string as a second guard."""
-    from .risk import _redact
-
-    return _redact(text)
+    return redact_secrets(text)
 
 
 @dataclass

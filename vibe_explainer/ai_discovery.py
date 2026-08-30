@@ -16,11 +16,13 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+import stat
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from .scanner import SKIP_DIRS
+from .security_utils import redact_secrets
 
 # Extensions worth content-scanning for AI evidence. Broader than scanner.CODE_EXTS
 # because config/env files are where secrets and MCP transport config tend to live.
@@ -211,13 +213,28 @@ def _iter_candidate_files(root_path: Path):
 
 
 def _read_text(path: Path) -> str | None:
+    """Read one bounded regular file without following a final symlink.
+
+    Repositories are untrusted input. Refusing symlinks and special files prevents
+    out-of-scope reads and blocking on FIFOs/devices. ``O_NOFOLLOW`` also closes the
+    common check/open race on platforms that provide it.
+    """
     try:
-        if path.stat().st_size > MAX_FILE_BYTES:
+        metadata = path.lstat()
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_FILE_BYTES:
             return None
     except OSError:
         return None
     try:
-        return path.read_text(encoding="utf-8", errors="ignore")
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+        try:
+            data = os.read(fd, MAX_FILE_BYTES + 1)
+        finally:
+            os.close(fd)
+        if len(data) > MAX_FILE_BYTES:
+            return None
+        return data.decode("utf-8", errors="ignore")
     except OSError:
         return None
 
@@ -297,7 +314,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                 line_end = text.find("\n", match.start())
                 if line_end == -1:
                     line_end = len(text)
-                evidence = text[line_start:line_end].strip()
+                evidence = redact_secrets(text[line_start:line_end].strip())
                 if len(evidence) > 160:
                     evidence = evidence[:157] + "..."
 

@@ -20,7 +20,6 @@ combination was found by this scanner — never state or imply the repository is
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,6 +35,7 @@ from .controls import (
     SecurityControl,
 )
 from .dataflow import DataFlowGraph, DataFlowObservation
+from .security_utils import redact_secrets
 
 SEVERITY_LOW = "LOW"
 SEVERITY_MODERATE = "MODERATE"
@@ -45,11 +45,9 @@ SEVERITY_CRITICAL = "CRITICAL"
 COMPLETENESS_COMPLETE = "COMPLETE"
 COMPLETENESS_PARTIAL = "PARTIAL"
 
-_SECRET_PATTERN = re.compile(r"sk-[A-Za-z0-9_-]{20,}")
-
-
 def _redact(text: str) -> str:
-    return _SECRET_PATTERN.sub("[REDACTED]", text)
+    """Backward-compatible internal alias for the shared redaction boundary."""
+    return redact_secrets(text)
 
 
 def score_risk(exposure: int, safety_impact: int, security_exposure: int, likelihood: int) -> int:
