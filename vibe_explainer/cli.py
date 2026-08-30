@@ -12,6 +12,13 @@ from .report import render_markdown
 from .scanner import scan_repo
 
 
+def _print_portable(output: str) -> None:
+    """Print without crashing on legacy Windows console encodings."""
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    portable = output.encode(encoding, errors="replace").decode(encoding)
+    print(portable)
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="vibe-explainer",
@@ -109,7 +116,7 @@ def _run_security_mode(repo: Path, as_json: bool, as_consultant: bool, out: str 
         out_path.write_text(output, encoding="utf-8")
         print(f"Wrote {out_path}", file=sys.stderr)
     else:
-        print(output)
+        _print_portable(output)
 
     # A HIGH/CRITICAL risk finding is a successful assessment result, not a tool
     # failure — exit 0 whenever the assessment itself completed.
@@ -153,7 +160,7 @@ def main(argv: list[str] | None = None) -> int:
         out_path.write_text(md, encoding="utf-8")
         print(f"Wrote {out_path}", file=sys.stderr)
     else:
-        print(md)
+        _print_portable(md)
 
     return 0
 

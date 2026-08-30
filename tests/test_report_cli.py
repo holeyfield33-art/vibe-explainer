@@ -1,4 +1,5 @@
 import json
+import io
 import subprocess
 import sys
 import unittest
@@ -9,11 +10,27 @@ from vibe_explainer.attack_surface import build_attack_surface
 from vibe_explainer.controls import assess_controls
 from vibe_explainer.dataflow import build_dataflow
 from vibe_explainer.readiness import assess_readiness
+from vibe_explainer.cli import _print_portable
 from vibe_explainer.risk import assess_risks
 from vibe_explainer.security_report import build_report, render_text, _repo_name
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+class TestPortableOutput(unittest.TestCase):
+    def test_legacy_windows_encoding_replaces_unsupported_glyphs(self):
+        raw = io.BytesIO()
+        stream = io.TextIOWrapper(raw, encoding="cp1252")
+        original = sys.stdout
+        try:
+            sys.stdout = stream
+            _print_portable("PASS \u2500 safe")
+            stream.flush()
+        finally:
+            sys.stdout = original
+
+        self.assertEqual(raw.getvalue().decode("cp1252").strip(), "PASS ? safe")
 
 
 def _report(fixture_name: str):
