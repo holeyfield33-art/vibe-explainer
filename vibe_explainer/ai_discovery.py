@@ -269,7 +269,15 @@ def _read_text(path: Path) -> str | None:
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(path, flags)
         try:
-            data = os.read(fd, MAX_FILE_BYTES + 1)
+            chunks: list[bytes] = []
+            remaining = MAX_FILE_BYTES + 1
+            while remaining > 0:
+                chunk = os.read(fd, remaining)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            data = b"".join(chunks)
         finally:
             os.close(fd)
         if len(data) > MAX_FILE_BYTES:
