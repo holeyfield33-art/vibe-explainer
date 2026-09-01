@@ -137,7 +137,7 @@ Current hardening guarantees:
 - file symlinks and non-regular files are skipped;
 - bounded file reads;
 - secret redaction at evidence and report boundaries; and
-- a 90% branch-coverage gate (currently 94% across the package).
+- a 90% branch-coverage gate (currently ~92% across the package).
 
 Reports remain potentially sensitive and should be reviewed before sharing.
 
