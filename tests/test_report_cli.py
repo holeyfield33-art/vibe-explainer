@@ -239,6 +239,19 @@ class TestSecretRedaction(unittest.TestCase):
                 self.assertNotIn(secret, out)
                 self.assertIn("[REDACTED]", out)
 
+    def test_url_password_with_embedded_at_sign_fully_redacted(self):
+        # Regression for the @-in-password truncation bug (TASK 3): the whole
+        # password, including embedded @, must be replaced, leaving nothing but
+        # [REDACTED] between the colon and the final @ before the host.
+        url = "postgres://admin:Sup3r@Secret@db.internal:5432/prod"
+        out = redact_secrets(url)
+        self.assertNotIn("Sup3r@Secret", out)
+        self.assertNotIn("Secret", out)
+        self.assertEqual(out, "postgres://admin:[REDACTED]@db.internal:5432/prod")
+        # A URL with no credentials must be left untouched.
+        no_cred = "postgres://db.internal:5432/prod"
+        self.assertEqual(redact_secrets(no_cred), no_cred)
+
     def test_no_secret_value_anywhere_in_report(self):
         report = _report("hardcoded-credential")
         js = report.to_json()

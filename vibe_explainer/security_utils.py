@@ -22,7 +22,11 @@ _SENSITIVE_ASSIGNMENT = re.compile(
     r"\b\s*[:=]\s*)([^\s,;}]+|[\"'][^\"']*[\"'])"
 )
 
-_URL_CREDENTIALS = re.compile(r"(?i)([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s/@]+(@)")
+# The password run allows ``@`` and is greedy up to the LAST ``@`` before the
+# host/path boundary (``/`` or whitespace ends the authority component), so a
+# password containing embedded ``@`` (e.g. ``user:Sup3r@Secret@host/db``) is
+# redacted in full rather than only up to the first ``@``.
+_URL_CREDENTIALS = re.compile(r"(?i)([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s/]+(@)")
 
 
 def redact_secrets(text: str) -> str:
