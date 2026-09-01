@@ -176,5 +176,64 @@ class TestCLIInProcess(unittest.TestCase):
         self.assertIn("Unable to analyze", stderr.getvalue())
 
 
+class TestInlineCredentialRedactionEndToEnd(unittest.TestCase):
+    """End-to-end regression for the audit leak: a live credential embedded on the
+    same source line as AI-relevant code (RAG/vector-DB connection shape).
+
+    Unit tests on redact_secrets() prove the pattern; this drives the *actual*
+    assessment pipeline (discovery -> ... -> report) against a fixture and asserts
+    the raw secret survives in neither the JSON output nor the consultant Markdown
+    deliverable. This is the test class that would have caught the original gap.
+    """
+
+    # Raw secret values embedded in tests/fixtures/rag-inline-credential/rag_store.py.
+    RAW_SECRETS = ("Sup3r@Secret", "Pl4inTextVectorDbPass")
+    FIXTURE = FIXTURES / "rag-inline-credential"
+
+    def _build_report(self):
+        from vibe_explainer.ai_discovery import discover_ai
+        from vibe_explainer.attack_surface import build_attack_surface
+        from vibe_explainer.controls import assess_controls
+        from vibe_explainer.dataflow import build_dataflow
+        from vibe_explainer.readiness import assess_readiness
+        from vibe_explainer.risk import assess_risks
+        from vibe_explainer.security_report import build_report
+
+        discovery = discover_ai(self.FIXTURE)
+        surface = build_attack_surface(discovery)
+        graph = build_dataflow(discovery)
+        controls = assess_controls(discovery, surface, graph)
+        risks = assess_risks(discovery, surface, graph, controls)
+        readiness = assess_readiness(discovery, surface, graph, controls, risks)
+        return discovery, build_report(discovery, surface, graph, controls, risks, readiness)
+
+    def test_credential_line_is_actually_scanned(self):
+        # Guard against a silent regression where the fixture stops matching and the
+        # redaction assertions below become vacuously true.
+        discovery, _ = self._build_report()
+        evidence = " ".join(f.evidence for f in discovery.findings)
+        self.assertIn("create_engine", evidence)
+        self.assertIn("[REDACTED]", evidence)
+
+    def test_raw_secret_absent_from_json_output(self):
+        _, report = self._build_report()
+        js = report.to_json()
+        for secret in self.RAW_SECRETS:
+            self.assertNotIn(secret, js)
+        # The partial-password remainder after the first '@' must not leak either.
+        self.assertNotIn("Secret@vectordb", js)
+        self.assertIn("[REDACTED]", js)
+
+    def test_raw_secret_absent_from_consultant_markdown(self):
+        from vibe_explainer.consultant_report import render_consultant_markdown
+
+        _, report = self._build_report()
+        md = render_consultant_markdown(report)
+        for secret in self.RAW_SECRETS:
+            self.assertNotIn(secret, md)
+        self.assertNotIn("Secret@vectordb", md)
+        self.assertIn("[REDACTED]", md)
+
+
 if __name__ == "__main__":
     unittest.main()
