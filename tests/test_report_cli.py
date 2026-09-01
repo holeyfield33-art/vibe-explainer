@@ -212,6 +212,33 @@ class TestSecretRedaction(unittest.TestCase):
                     redact_secrets(sample),
                 )
 
+    def test_prefixed_keyword_assignments_still_redacted(self):
+        # Regression guard: making the identifier prefix optional (TASK 2) must NOT
+        # weaken the existing prefixed-variable behavior.
+        for sample, secret in (
+            ('MY_PASSWORD = "hunter2secretvalue"', "hunter2secretvalue"),
+            ('DB_TOKEN = "tok_liveABCDEF"', "tok_liveABCDEF"),
+            ('AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMIsecret"', "wJalrXUtnFEMIsecret"),
+        ):
+            with self.subTest(sample=sample):
+                out = redact_secrets(sample)
+                self.assertNotIn(secret, out)
+                self.assertIn("[REDACTED]", out)
+
+    def test_bare_keyword_assignments_are_redacted(self):
+        # Regression for the bare-keyword bypass: PASSWORD/TOKEN/SECRET/API_KEY with
+        # no leading identifier segment were not redacted before TASK 2.
+        for sample, secret in (
+            ('PASSWORD = "bareSecret123"', "bareSecret123"),
+            ('TOKEN = "bareTokenXYZ"', "bareTokenXYZ"),
+            ('SECRET = "bareSecretVal"', "bareSecretVal"),
+            ('API_KEY = "bareApiKeyVal"', "bareApiKeyVal"),
+        ):
+            with self.subTest(sample=sample):
+                out = redact_secrets(sample)
+                self.assertNotIn(secret, out)
+                self.assertIn("[REDACTED]", out)
+
     def test_no_secret_value_anywhere_in_report(self):
         report = _report("hardcoded-credential")
         js = report.to_json()

@@ -15,7 +15,10 @@ _SECRET_VALUE_PATTERNS = (
 )
 
 _SENSITIVE_ASSIGNMENT = re.compile(
-    r"(?i)(\b[A-Za-z_][A-Za-z0-9_]*(?:API[_-]?KEY|ACCESS[_-]?KEY|TOKEN|SECRET|PASSWORD|PRIVATE[_-]?KEY)"
+    # The identifier prefix is optional (zero-or-more, not one-or-more) so a bare
+    # keyword such as ``PASSWORD = "..."`` or ``TOKEN = "..."`` is redacted, not just
+    # prefixed forms like ``MY_PASSWORD``/``DB_TOKEN``.
+    r"(?i)(\b(?:[A-Za-z_][A-Za-z0-9_]*)?(?:API[_-]?KEY|ACCESS[_-]?KEY|TOKEN|SECRET|PASSWORD|PRIVATE[_-]?KEY)"
     r"\b\s*[:=]\s*)([^\s,;}]+|[\"'][^\"']*[\"'])"
 )
 
