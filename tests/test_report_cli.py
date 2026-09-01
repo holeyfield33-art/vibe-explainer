@@ -13,6 +13,7 @@ from vibe_explainer.readiness import assess_readiness
 from vibe_explainer.cli import _print_portable
 from vibe_explainer.risk import assess_risks
 from vibe_explainer.security_report import build_report, render_text, _repo_name
+from vibe_explainer.security_utils import redact_secrets
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -196,6 +197,21 @@ class TestLimitations(unittest.TestCase):
 
 
 class TestSecretRedaction(unittest.TestCase):
+    def test_common_secret_formats_and_assignments_are_redacted(self):
+        samples = (
+            'ANTHROPIC_API_KEY = "custom-provider-secret"',
+            "AWS_SECRET_ACCESS_KEY=aws-secret-value",
+            "postgresql://user:database-password@example.test/db",
+            "AKIAIOSFODNN7EXAMPLE",
+            "ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertNotIn(
+                    sample.split("=")[-1].strip('"') if "=" in sample else sample,
+                    redact_secrets(sample),
+                )
+
     def test_no_secret_value_anywhere_in_report(self):
         report = _report("hardcoded-credential")
         js = report.to_json()

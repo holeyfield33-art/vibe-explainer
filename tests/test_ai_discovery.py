@@ -1,4 +1,6 @@
 import unittest
+import os
+import tempfile
 from pathlib import Path
 
 from vibe_explainer.ai_discovery import discover_ai
@@ -239,6 +241,44 @@ class TestEnvBasedCredentialReference(unittest.TestCase):
             if f.name == "Env-based credential reference" and f.file == "ai_discovery.py"
         ]
         self.assertEqual(self_matches, [])
+
+
+class TestUntrustedFilesystemSafety(unittest.TestCase):
+    def test_file_symlink_outside_root_is_not_read(self):
+        with tempfile.TemporaryDirectory() as root_dir, tempfile.TemporaryDirectory() as outside_dir:
+            root = Path(root_dir)
+            outside = Path(outside_dir) / "secret.py"
+            outside.write_text('from openai import OpenAI\nOPENAI_API_KEY = "outside-secret"\n')
+            (root / "linked.py").symlink_to(outside)
+
+            result = discover_ai(root)
+
+            self.assertEqual(result.findings, [])
+            self.assertEqual(result.files_scanned, 0)
+
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "FIFO test requires POSIX")
+    def test_fifo_is_skipped_without_opening(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            fifo = Path(root_dir) / "blocked.py"
+            os.mkfifo(fifo)
+
+            result = discover_ai(root_dir)
+
+            self.assertEqual(result.findings, [])
+            self.assertEqual(result.files_scanned, 0)
+
+
+class TestEarlyEvidenceRedaction(unittest.TestCase):
+    def test_unknown_format_secret_assignment_is_redacted_in_discovery(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            source = Path(root_dir) / "app.py"
+            source.write_text('from openai import OpenAI\nOPENAI_API_KEY = "not-an-sk-secret-value"\n')
+
+            result = discover_ai(root_dir)
+
+            serialized = str(result.to_dict())
+            self.assertNotIn("not-an-sk-secret-value", serialized)
+            self.assertIn("[REDACTED]", serialized)
 
 
 if __name__ == "__main__":

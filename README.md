@@ -84,8 +84,12 @@ findings — a finding is a result, not a crash), `1` = analysis error, `2` = us
 - **Truncation is loud.** If discovery is truncated on a large repo, the assessment is
   marked `PARTIAL` and the report states plainly that counts are a lower bound — never
   "only N risks."
-- **Secrets are redacted.** Any credential-shaped value is replaced with `[REDACTED]`
-  everywhere in every output, enforced at the serialization boundary.
+- **Secrets are redacted (defense-in-depth).** Known credential shapes — provider API
+  keys, cloud access keys, JWTs, private-key blocks, `KEY=`/`TOKEN=`/`SECRET=`/`PASSWORD=`
+  assignments, and URL-embedded credentials — are replaced with `[REDACTED]` at the
+  evidence and serialization boundaries. This reduces exposure but is not a guarantee that
+  every possible secret format is caught; treat reports as potentially sensitive and review
+  them before sharing.
 - **No manufactured findings.** A repo with no AI surface reports exactly that — not a
   fabricated "LOW risk / Level 1 / looks secure."
 - **Every claim is traceable.** Attack-surface rows, risk scenarios, and recommendations
@@ -119,6 +123,70 @@ Architecture and per-stage methodology are documented in `docs/` (`PHASE-1`...`P
 - Distinguish "not detected" from "does not exist" from "not applicable"
 - Keep risk (how concerning) and readiness (how mature) strictly separate
 - Be loud about limitations, truncation, and what wasn't checked
+
+## Scope and hardening
+
+**Experimental prototype — not production security assurance.** The repository
+contains both the original mental-model report and an experimental `--security`
+static evidence pipeline. The security pipeline uses regex and proximity heuristics;
+it does not prove exploitability, control effectiveness, compliance, or maturity.
+
+Current hardening guarantees:
+
+- local/offline analysis with no target-code execution;
+- file symlinks and non-regular files are skipped;
+- bounded file reads;
+- secret redaction at evidence and report boundaries; and
+- a 90% branch-coverage gate (currently 94% across the package).
+
+Reports remain potentially sensitive and should be reviewed before sharing.
+
+See [SPEC.md](SPEC.md) for the full product specification.
+
+## Quick start (development)
+
+```bash
+cd vibe-explainer
+python -m vibe_explainer examples/sample-vibe-project --offline
+python -m vibe_explainer examples/sample-vibe-project --offline --out /tmp/explain.md
+python -m vibe_explainer tests/fixtures/basic-chatbot --security --json
+python -m unittest discover -s tests
+python -m coverage run -m unittest discover -s tests
+python -m coverage report
+```
+
+The coverage commands require the development-only `coverage` package.
+
+## Security-mode limitations
+
+- Language coverage is uneven; detection is primarily shaped around Python forms.
+- Comments, strings, examples, tests, generated code, and production code are not
+  yet reliably distinguished.
+- Data-flow relationships are same-file line-proximity inferences, not control-flow
+  or taint analysis.
+- Numeric risk severities and readiness levels are deterministic policy outputs,
+  not empirically calibrated predictions.
+- A unified coverage ledger and scan-wide resource budgets remain unfinished.
+
+See [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and the open GitHub
+issues for the hardening backlog.
+
+## Design principles (inherited from vibe-check)
+
+- Prefer offline / deterministic where possible
+- Be honest about limitations and coverage
+- Produce something a human actually reads
+- Stay small enough that the tool itself is understandable
+- Never pretend a zero means more than what was actually checked
+
+## Part of the Aletheia toolchain
+
+```
+Aletheia portfolio auditor  → which repos need attention
+vibe-check                 → what’s wrong / triage disposition
+vibe-explainer             → here’s the map so a human can look productively
+Lie Detector               → does the repo do what it claims
+```
 
 ## License
 

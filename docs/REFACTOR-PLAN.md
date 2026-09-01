@@ -1,5 +1,9 @@
 # Refactor Plan — AI Security Readiness (Phases 0–2)
 
+> **Historical document:** This plan records the original phased implementation and
+> is not the current production-readiness plan. The current hardening backlog is in
+> GitHub issues #4–#13, with completed security changes recorded in `CHANGELOG.md`.
+
 ## Baseline (recorded before any changes)
 
 - Commits: 1 (`b494210 Add scanner.py and report.py core modules`)

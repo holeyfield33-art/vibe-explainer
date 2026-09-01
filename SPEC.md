@@ -1,4 +1,9 @@
-# Vibe Explainer — Product Spec (v0.1)
+# Vibe Explainer — Product Spec (v0.1, legacy mental-model scope)
+
+> **Current scope note:** This document describes the original mental-model product.
+> The repository now also contains an experimental static AI security evidence
+> pipeline. That pipeline is not a vulnerability scanner, compliance assessment, or
+> maturity certification. Product consolidation remains unfinished.
 
 ## Problem
 
@@ -97,3 +102,10 @@ Lie Detector               → does the repo do what it claims
 - Whether to emit characterization-test stubs
 - Interactive HTML vs pure markdown first
 - Local model support (Ollama etc.) as first-class offline+LLM path
+
+## Untrusted-repository handling
+
+All modes must treat repository trees as hostile input. File symlinks and non-regular
+files are skipped, content reads are bounded, and evidence is redacted before
+serialization. Scan-wide resource budgets and a unified coverage ledger remain
+required before a production-ready milestone.
