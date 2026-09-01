@@ -1,0 +1,8 @@
+[run]
+branch = True
+source = vibe_explainer
+
+[report]
+fail_under = 90
+show_missing = True
+skip_covered = False

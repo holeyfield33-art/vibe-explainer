@@ -1,5 +1,9 @@
 # Phase 5 — AI Security Risk Assessment
 
+> **Calibration warning:** Factor values and severity thresholds are deterministic
+> policy constants and have not been calibrated against real incidents or a labeled
+> vulnerable/secure repository corpus.
+
 **The risk engine evaluates risk represented by repository evidence. It does not prove
 exploitability or establish that a vulnerability can be successfully exploited.**
 

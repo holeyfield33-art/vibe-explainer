@@ -13,6 +13,7 @@ from vibe_explainer.readiness import assess_readiness
 from vibe_explainer.cli import _print_portable
 from vibe_explainer.risk import assess_risks
 from vibe_explainer.security_report import build_report, render_text, _repo_name
+from vibe_explainer.security_utils import redact_secrets
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -196,6 +197,61 @@ class TestLimitations(unittest.TestCase):
 
 
 class TestSecretRedaction(unittest.TestCase):
+    def test_common_secret_formats_and_assignments_are_redacted(self):
+        samples = (
+            'ANTHROPIC_API_KEY = "custom-provider-secret"',
+            "AWS_SECRET_ACCESS_KEY=aws-secret-value",
+            "postgresql://user:database-password@example.test/db",
+            "AKIAIOSFODNN7EXAMPLE",
+            "ghp_abcdefghijklmnopqrstuvwxyz1234567890",
+        )
+        for sample in samples:
+            with self.subTest(sample=sample):
+                self.assertNotIn(
+                    sample.split("=")[-1].strip('"') if "=" in sample else sample,
+                    redact_secrets(sample),
+                )
+
+    def test_prefixed_keyword_assignments_still_redacted(self):
+        # Regression guard: making the identifier prefix optional (TASK 2) must NOT
+        # weaken the existing prefixed-variable behavior.
+        for sample, secret in (
+            ('MY_PASSWORD = "hunter2secretvalue"', "hunter2secretvalue"),
+            ('DB_TOKEN = "tok_liveABCDEF"', "tok_liveABCDEF"),
+            ('AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMIsecret"', "wJalrXUtnFEMIsecret"),
+        ):
+            with self.subTest(sample=sample):
+                out = redact_secrets(sample)
+                self.assertNotIn(secret, out)
+                self.assertIn("[REDACTED]", out)
+
+    def test_bare_keyword_assignments_are_redacted(self):
+        # Regression for the bare-keyword bypass: PASSWORD/TOKEN/SECRET/API_KEY with
+        # no leading identifier segment were not redacted before TASK 2.
+        for sample, secret in (
+            ('PASSWORD = "bareSecret123"', "bareSecret123"),
+            ('TOKEN = "bareTokenXYZ"', "bareTokenXYZ"),
+            ('SECRET = "bareSecretVal"', "bareSecretVal"),
+            ('API_KEY = "bareApiKeyVal"', "bareApiKeyVal"),
+        ):
+            with self.subTest(sample=sample):
+                out = redact_secrets(sample)
+                self.assertNotIn(secret, out)
+                self.assertIn("[REDACTED]", out)
+
+    def test_url_password_with_embedded_at_sign_fully_redacted(self):
+        # Regression for the @-in-password truncation bug (TASK 3): the whole
+        # password, including embedded @, must be replaced, leaving nothing but
+        # [REDACTED] between the colon and the final @ before the host.
+        url = "postgres://admin:Sup3r@Secret@db.internal:5432/prod"
+        out = redact_secrets(url)
+        self.assertNotIn("Sup3r@Secret", out)
+        self.assertNotIn("Secret", out)
+        self.assertEqual(out, "postgres://admin:[REDACTED]@db.internal:5432/prod")
+        # A URL with no credentials must be left untouched.
+        no_cred = "postgres://db.internal:5432/prod"
+        self.assertEqual(redact_secrets(no_cred), no_cred)
+
     def test_no_secret_value_anywhere_in_report(self):
         report = _report("hardcoded-credential")
         js = report.to_json()

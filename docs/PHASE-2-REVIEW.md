@@ -4,6 +4,10 @@ Scope: bounded review of `ai_discovery.py` / `attack_surface.py` before Phase 3 
 No new product features added. Two minimum-change fixes applied for blocking issues found
 during the review (below); everything else is documentation-only.
 
+> **Hardening update:** Discovery evidence is sanitized before storage, and content
+> scanning rejects file symlinks and non-regular entries. Syntax/file-context
+> classification remains unfinished; the limitations below still apply.
+
 ## 1. Data model review
 
 `AIFinding`: `category`, `name`, `file`, `line`, `evidence`, `confidence` — all present as
