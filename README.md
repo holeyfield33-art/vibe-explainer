@@ -117,10 +117,18 @@ it does not prove exploitability, control effectiveness, compliance, or maturity
 Current hardening guarantees:
 
 - local/offline analysis with no target-code execution;
-- file symlinks and non-regular files are skipped;
-- bounded file reads;
-- secret redaction at evidence and report boundaries; and
+- file and directory symlinks and non-regular files are skipped, via one
+  centralized walker shared by every scan stage;
+- bounded file reads, plus global scan budgets (file count, total bytes,
+  elapsed time) so a large or hostile tree can't exhaust the scan host;
+- secret redaction at evidence construction and report boundaries, not only
+  at the final report; and
 - a 90% branch-coverage gate (currently ~92% across the package).
+
+Any file skipped for size, unreadable, or dropped because a scan budget was
+hit is counted, and forces `assessment_completeness = PARTIAL` with explicit
+lower-bound language everywhere completeness is reported — never silently
+reported as a complete scan.
 
 Reports remain potentially sensitive and should be reviewed before sharing.
 
@@ -149,7 +157,6 @@ The coverage commands require the development-only `coverage` package.
   or taint analysis.
 - Numeric risk severities and readiness levels are deterministic policy outputs,
   not empirically calibrated predictions.
-- A unified coverage ledger and scan-wide resource budgets remain unfinished.
 
 See [SECURITY.md](SECURITY.md), [CHANGELOG.md](CHANGELOG.md), and the open GitHub
 issues for the hardening backlog.
