@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .exclusion_policy import classify_dir_exclusion
+from .exclusion_policy import classify_dir_exclusion, safe_regular_file_size
 from .file_context import classify_file
 
 # Extensions the content scanner can analyze (superset of ai_discovery.SCAN_EXTS,
@@ -119,11 +119,17 @@ def crawl_repository(root: str | Path, *, read_content_for_context: bool = False
 
     for dirpath, dirnames, filenames in os.walk(root_path):
         # Record excluded directories (one representative record) then prune them.
+        # A directory symlink is recorded and pruned the same way as an excluded
+        # dir: os.walk's default followlinks=False already refuses to recurse
+        # into it, but leaving it in dirnames invites some later stage to
+        # .resolve()/.stat() through it (out-of-tree read). is_symlink() checks
+        # the link itself, not its target — an lstat-based check.
         retained = []
         for d in dirnames:
+            dir_path = Path(dirpath) / d
+            rel = str(dir_path.relative_to(root_path)).replace("\\", "/")
             excl = classify_dir_exclusion(d)
             if excl.excluded:
-                rel = str((Path(dirpath) / d).relative_to(root_path)).replace("\\", "/")
                 result.files.append(
                     FileRecord(
                         rel_path=rel + "/",
@@ -136,18 +142,42 @@ def crawl_repository(root: str | Path, *, read_content_for_context: bool = False
                         exclusion_category=excl.category,
                     )
                 )
+            elif dir_path.is_symlink():
+                result.files.append(
+                    FileRecord(
+                        rel_path=rel + "/",
+                        ext="",
+                        size=0,
+                        disposition=DISP_EXCLUDED,
+                        context="GENERATED",
+                        context_confidence="high",
+                        reason="directory symlink — not followed",
+                        exclusion_category="SYMLINK",
+                    )
+                )
             else:
                 retained.append(d)
-        dirnames[:] = retained
+        dirnames[:] = sorted(retained)
 
-        for name in filenames:
+        for name in sorted(filenames):
             full = Path(dirpath) / name
             rel = str(full.relative_to(root_path)).replace("\\", "/")
             ext = full.suffix.lower()
-            try:
-                size = full.stat().st_size
-            except OSError:
-                result.files.append(FileRecord(rel, ext, 0, DISP_UNREADABLE, "UNKNOWN", "low", reason="stat failed"))
+            size = safe_regular_file_size(full)
+            if size is None:
+                # Either unreadable, or not a regular file (symlink, FIFO,
+                # device) — never follow a symlink to find out what it is.
+                try:
+                    is_symlink = full.is_symlink()
+                except OSError:
+                    is_symlink = False
+                if is_symlink:
+                    result.files.append(
+                        FileRecord(rel, ext, 0, DISP_EXCLUDED, "GENERATED", "high",
+                                   reason="file symlink — not followed", exclusion_category="SYMLINK")
+                    )
+                else:
+                    result.files.append(FileRecord(rel, ext, 0, DISP_UNREADABLE, "UNKNOWN", "low", reason="stat failed"))
                 continue
 
             if ext in _BINARY_EXTS:

@@ -1,99 +1,54 @@
-# Vibe Explainer
+# Aletheia AI Readiness Audit
+**Static security posture assessment for AI-integrated systems.**
 
-**Static AI security readiness assessment for any repository.**
+The Aletheia AI Readiness Audit (formerly Vibe Explainer) provides a structured, evidence-backed assessment of a repository's AI security posture. It maps the attack surface, identifies risks, and scores the project's security maturity against an industry-standard framework.
 
-Point it at a codebase and get a structured, evidence-backed assessment of its AI
-security posture: what AI components exist, what attack surface they create, how data
-and capability flow between them, which security controls are present, what risks that
-evidence represents, and how mature the repository's demonstrated security practice is —
-scored against a four-level readiness model.
-
-The risk scoring and readiness levels are aligned to the **HackerOne "Security for AI:
-Readiness and Risk Playbook"** framework (four-factor risk scoring, four readiness
-levels from Baseline to Continuous, and a Preventive / Validation / Governance control
-taxonomy), so the output maps to vocabulary security teams already recognize.
+Instead of subjective "vibes," this tool produces a clinical analysis of what the code *demonstrates* about its security practices.
 
 ```bash
-python -m vibe_explainer /path/to/repo --security             # human-readable summary
-python -m vibe_explainer /path/to/repo --security --json      # full machine-readable assessment
-python -m vibe_explainer /path/to/repo --security --consultant # consultant-grade Markdown report
+python -m vibe_explainer /path/to/repo --security --consultant
 ```
 
-Everything runs **offline and deterministically** — Python stdlib only, no API keys, no
-network, same repo in, same assessment out.
-
-> **What this is, and what it is not.** Vibe Explainer performs *static, evidence-based*
-> analysis. It reports what the repository's own code and configuration demonstrate. It
-> does **not** execute the application, prove exploitability, or replace adversarial
-> testing or a manual security review. Every conclusion it prints traces back to a
-> specific finding, data-flow observation, or control — that evidence chain is the point.
+You receive a professional **Consultant-Grade Report** that maps findings to the **HackerOne "Security for AI: Readiness and Risk Playbook"**, providing a common vocabulary for security teams and executives.
 
 ---
 
-## The assessment pipeline
+## 🛡️ The Assessment Pipeline
 
-Each stage consumes the previous one; nothing is re-scanned or re-scored downstream.
+The tool performs a multi-stage static analysis to build a complete picture of the AI surface.
 
-```
-Repository
-   |  AI discovery          - model providers, prompt surfaces, RAG, tools, MCP, secrets...
-   |  Attack surface        - six buckets: inputs, model, retrieval, tools, outputs, storage
-   |  Data flow             - same-file, evidence-based relationships between components
-   |  Security controls     - 12 controls, DETECTED / PARTIAL / NOT_DETECTED / NOT_APPLICABLE
-   |  Risk scenarios        - four-factor scoring (Exposure . Safety . Security . Likelihood)
-   |  Readiness             - Level 1 Baseline -> 4 Continuous, independent of risk severity
-   |  Report                - executive summary, evidence appendix, prioritized remediations
-```
+**The Workflow:**
+`Repository` $\rightarrow$ `AI Discovery` $\rightarrow$ `Attack Surface` $\rightarrow$ `Data Flow` $\rightarrow$ `Security Controls` $\rightarrow$ `Risk Scoring` $\rightarrow$ `Readiness Level` $\rightarrow$ `Final Report`
 
-### What each stage promises — and refuses to claim
+### Key Analytical Pillars
 
-- **Discovery** finds AI-relevant code by content, tagging every finding with
-  `file:line`, the matched evidence, and a confidence level. It never treats a keyword as
-  proof.
-- **Controls** report *evidence of a control*, never that a control is complete or
-  effective. `NOT_DETECTED` means "no supporting evidence was found here" — **not** "this
-  control does not exist" (it may live outside the repository).
-- **Risk** scores the concern represented by the evidence. It never claims a path is
-  exploitable — every scenario rationale says so explicitly.
-- **Readiness** measures *demonstrated process maturity*, and is deliberately independent
-  of risk severity. A repo can carry a high-severity risk at an early readiness level, or
-  vice versa. Running Vibe Explainer on a repo does not itself raise that repo's readiness.
+- **Discovery**: Identifies model providers, prompt surfaces, RAG pipelines, and MCP tools. It distinguishes between `Production` code and `Test/Demo` content to avoid noise.
+- **Controls**: Scans for 12 specific security controls (Preventive, Validation, Governance). It reports *evidence of a control*, never assuming effectiveness.
+- **Risk**: Scores concerns based on a four-factor formula (Exposure $\cdot$ Safety $\cdot$ Security $\cdot$ Likelihood).
+- **Readiness**: Measures demonstrated process maturity on a 4-level scale:
+    - **Level 1: Baseline** (AI as a feature, essential safeguards).
+    - **Level 2: Managed** (Defined, repeatable testing).
+    - **Level 3: Hardened** (Security-first, adversarial signals).
+    - **Level 4: Continuous** (Automated AI assurance/SRE for models).
 
-## Context awareness
+---
 
-A real AI repository contains the same strings in production code, test fixtures, demo
-payloads, generated manifests, and documentation. Vibe Explainer labels every finding by
-**context** — `Production`, `Test`, `Example`, `Documentation`, or `Generated` — so a
-genuine production surface is never buried under thirty test-fixture matches of the same
-pattern. The executive summary reports how many findings are in production code versus
-everything else, and the consultant report lists production surface first.
+## 💎 Professional Guarantees
 
-## Output modes
+Designed for high-integrity auditing, the tool adheres to strict honesty principles:
 
-| Mode | Flag | Use |
-|------|------|-----|
-| Terminal summary | `--security` | Quick read: surface, top risks, readiness, blockers, recommendations |
-| Full JSON | `--security --json` | Machine-readable; complete assessment with every ID for traceability |
-| Consultant report | `--security --consultant` | Professional Markdown deliverable with an evidence appendix |
-
-Exit codes are for tool status only: `0` = assessment completed (even with HIGH/CRITICAL
-findings — a finding is a result, not a crash), `1` = analysis error, `2` = usage error.
-
-## Honesty guarantees
-
+- **Deterministic & Offline**: No API keys, no network. Same repo in, same report out.
+- **Evidence-First**: Every risk and recommendation traces back to a specific finding ID and line of code.
 - **Truncation is loud.** If discovery is truncated on a large repo, the assessment is
   marked `PARTIAL` and the report states plainly that counts are a lower bound — never
   "only N risks."
-- **Secrets are redacted (defense-in-depth).** Known credential shapes — provider API
+- **No Manufactured Findings**: If no AI surface is detected, the tool reports exactly that—it does not fabricate "Low Risk" to fill a report.
+- **Secret Redaction (defense-in-depth)**: Known credential shapes — provider API
   keys, cloud access keys, JWTs, private-key blocks, `KEY=`/`TOKEN=`/`SECRET=`/`PASSWORD=`
   assignments, and URL-embedded credentials — are replaced with `[REDACTED]` at the
   evidence and serialization boundaries. This reduces exposure but is not a guarantee that
   every possible secret format is caught; treat reports as potentially sensitive and review
   them before sharing.
-- **No manufactured findings.** A repo with no AI surface reports exactly that — not a
-  fabricated "LOW risk / Level 1 / looks secure."
-- **Every claim is traceable.** Attack-surface rows, risk scenarios, and recommendations
-  all reference the finding / data-flow / control IDs they derive from.
 
 ## Legacy mode: repository mental model
 
@@ -101,16 +56,44 @@ The original orientation report is still available (default mode, no `--security
 "what is this repo and where do I start" map, optionally grounded in an external
 code-quality report.
 
+---
+
+## 🛠️ Quick Start
+
+**Prerequisites:** Python 3.10+
+
 ```bash
-python -m vibe_explainer /path/to/repo                          # mental-model report
-python -m vibe_explainer /path/to/repo --vibe-check-report report.json
+# Terminal summary (Quick read)
+python -m vibe_explainer /path/to/repo --security
+
+# Full machine-readable assessment (for automation)
+python -m vibe_explainer /path/to/repo --security --json
+
+# Consultant report (Professional deliverable)
+python -m vibe_explainer /path/to/repo --security --consultant
 ```
 
-## Development
+---
 
-```bash
-python -m unittest discover -s tests        # full suite
-python -m vibe_explainer examples/sample-vibe-project --security
+## 🎯 Use Cases
+
+- **Pre-Acquisition Due Diligence**: Quickly assess the AI security maturity of a target company.
+- **Internal Governance**: Baseline the security posture of various internal AI agents.
+- **Vendor Assessment**: Verify that an AI vendor's "Security" claims map to actual code evidence.
+- **Compliance**: Provide a structured starting point for AI security audits.
+
+---
+
+## 📂 Layout
+```
+vibe_explainer/
+  discovery.py   # AI component identification
+  surface.py     # Attack surface categorization
+  flow.py        # Data-flow analysis
+  controls.py    # Control evidence detection
+  risk.py        # Risk scenario scoring
+  readiness.py   # Readiness level adjudication
+  report.py      # Consultant report generation
 ```
 
 Architecture and per-stage methodology are documented in `docs/` (`PHASE-1`...`PHASE-7`,
@@ -183,8 +166,8 @@ issues for the hardening backlog.
 
 ```
 Aletheia portfolio auditor  → which repos need attention
-vibe-check                 → what’s wrong / triage disposition
-vibe-explainer             → here’s the map so a human can look productively
+vibe-check                 → what's wrong / triage disposition
+vibe-explainer             → here's the map so a human can look productively
 Lie Detector               → does the repo do what it claims
 ```
 

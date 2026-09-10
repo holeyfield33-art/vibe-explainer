@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .scanner import SKIP_DIRS
+from .exclusion_policy import walk_pruned
 from .file_context import classify_file
 from .security_utils import redact_secrets
 
@@ -238,13 +238,8 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
 ]
 
 
-def _should_skip_dir(name: str) -> bool:
-    return name in SKIP_DIRS or name.startswith(".")
-
-
 def _iter_candidate_files(root_path: Path):
-    for dirpath, dirnames, filenames in os.walk(root_path):
-        dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+    for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
             full = Path(dirpath) / name
             if full.suffix.lower() not in SCAN_EXTS:

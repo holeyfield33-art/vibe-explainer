@@ -30,7 +30,6 @@ No risk scoring, no readiness classification here — see docs/PHASE-4-CONTROLS.
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,7 +38,7 @@ from typing import Any
 from .ai_discovery import AIFinding, DiscoveryResult, MAX_FILE_BYTES, _iter_candidate_files, _read_text
 from .attack_surface import AttackSurfaceResult
 from .dataflow import MAX_DATAFLOW_LINE_DISTANCE, DataFlowGraph, DataFlowObservation
-from .scanner import SKIP_DIRS
+from .exclusion_policy import safe_regular_file_size, walk_pruned
 
 STATUS_DETECTED = "DETECTED"
 STATUS_PARTIAL = "PARTIAL"
@@ -178,13 +177,8 @@ def _evidence_id(file: str, line: int, tag: str) -> str:
     return digest[:12]
 
 
-def _should_skip_dir(name: str) -> bool:
-    return name in SKIP_DIRS or name.startswith(".")
-
-
 def _iter_doc_files(root_path: Path):
-    for dirpath, dirnames, filenames in os.walk(root_path):
-        dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+    for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
             full = Path(dirpath) / name
             if full.suffix.lower() in DOC_EXTS:
@@ -222,10 +216,8 @@ def _scan_code_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
 def _scan_doc_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
     by_control: dict[str, list[_EvidenceMatch]] = {}
     for file_path in _iter_doc_files(root_path):
-        try:
-            if file_path.stat().st_size > MAX_FILE_BYTES:
-                continue
-        except OSError:
+        size = safe_regular_file_size(file_path)
+        if size is None or size > MAX_FILE_BYTES:
             continue
         text = _read_text(file_path)
         if text is None:
