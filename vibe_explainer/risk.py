@@ -261,20 +261,39 @@ def assess_risks(
     framework's unmodified four-factor formula.
     """
     root = discovery.root
-    # Truncation here means repeated same-(file,category,name) matches were
+    # Truncation alone means repeated same-(file,category,name) matches were
     # summarized past a display cap — but every match was COUNTED (additional_matches
-    # is exact), nothing was left unassessed. That is aggregation, not incompleteness:
-    # mark AGGREGATED, not PARTIAL. PARTIAL is reserved for genuine gaps (surfaced via
-    # a real unreadable/unscanned signal, if/when discovery reports one).
-    completeness = COMPLETENESS_AGGREGATED if discovery.truncated else COMPLETENESS_COMPLETE
+    # is exact), nothing was left unassessed. That is aggregation, not incompleteness.
+    # A real coverage gap — a file skipped for size, a file that could not be read,
+    # or a global scan budget (file count / total bytes / elapsed time) being hit —
+    # means something in scope was never examined at all, which PARTIAL must reflect
+    # regardless of whether truncation also occurred.
+    has_coverage_gap = (
+        discovery.files_skipped_size > 0
+        or discovery.files_unreadable > 0
+        or discovery.budget_exhausted
+    )
+    if has_coverage_gap:
+        completeness = COMPLETENESS_PARTIAL
+    elif discovery.truncated:
+        completeness = COMPLETENESS_AGGREGATED
+    else:
+        completeness = COMPLETENESS_COMPLETE
 
     if not discovery.has_ai_signal():
+        no_signal_note = "No AI components were discovered in this repository — no AI security risk scenarios were generated."
+        if completeness == COMPLETENESS_PARTIAL:
+            no_signal_note += (
+                " This is a lower bound, not a clean bill of health: some in-scope files "
+                "were skipped (oversized, unreadable, or a scan budget was reached) and were "
+                "never examined."
+            )
         return RiskAssessment(
             root=root,
             ai_surface_detected=False,
             assessment_completeness=completeness,
             scenarios=[],
-            summary_note="No AI components were discovered in this repository — no AI security risk scenarios were generated.",
+            summary_note=no_signal_note,
         )
 
     by_category: dict[str, list[AIFinding]] = {}
@@ -632,7 +651,11 @@ def assess_risks(
         "criteria did not identify a risk-worthy combination."
     )
     if completeness == COMPLETENESS_PARTIAL:
-        summary_note += " Assessment may be incomplete because discovery results were truncated."
+        summary_note += (
+            " This is a lower bound, not a complete assessment: some in-scope files were "
+            "skipped (oversized, unreadable, or a scan budget was reached) and were never "
+            "examined for AI security evidence."
+        )
 
     return RiskAssessment(
         root=root,
