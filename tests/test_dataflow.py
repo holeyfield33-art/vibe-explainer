@@ -5,6 +5,7 @@ from vibe_explainer.ai_discovery import discover_ai
 from vibe_explainer.dataflow import (
     MAX_DATAFLOW_LINE_DISTANCE,
     STATUS_INFERRED,
+    DataFlowObservation,
     build_dataflow,
 )
 
@@ -195,6 +196,27 @@ class TestTruncatedPreserved(unittest.TestCase):
 class TestMaxDistanceIsRespected(unittest.TestCase):
     def test_threshold_constant_is_documented_and_used(self):
         self.assertEqual(MAX_DATAFLOW_LINE_DISTANCE, 30)
+
+
+class TestEvidenceRedactedAtConstruction(unittest.TestCase):
+    # Issue #22: evidence must be redacted at DataFlowObservation construction
+    # itself, not left to whichever downstream layer happens to redact later.
+
+    def test_secret_in_evidence_is_redacted_regardless_of_caller(self):
+        obs = DataFlowObservation(
+            source_finding_id="f1",
+            destination_finding_id="f2",
+            source_type="secret_config",
+            destination_type="ai_usage",
+            relationship="feeds",
+            file="app.py",
+            source_line=1,
+            destination_line=2,
+            confidence="moderate",
+            evidence='OPENAI_API_KEY = "sk-abcdefghijklmnopqrstuvwx" feeds call at line 2.',
+        )
+        self.assertNotIn("sk-abcdefghijklmnopqrstuvwx", obs.evidence)
+        self.assertIn("[REDACTED]", obs.evidence)
 
 
 if __name__ == "__main__":

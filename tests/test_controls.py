@@ -8,6 +8,7 @@ from vibe_explainer.controls import (
     STATUS_NOT_APPLICABLE,
     STATUS_NOT_DETECTED,
     STATUS_PARTIAL,
+    _line_evidence_text,
     assess_controls,
 )
 from vibe_explainer.dataflow import build_dataflow
@@ -298,6 +299,28 @@ class TestDeterminism(unittest.TestCase):
         assessment = _assess("basic-chatbot")
         ids = [c.control_id for c in assessment.controls]
         self.assertEqual(ids, sorted(ids))
+
+
+class TestEvidenceRedaction(unittest.TestCase):
+    # Issue #17: controls collected raw source lines into evidence without
+    # calling redact_secrets, unlike discovery which redacts at match time.
+
+    def test_openai_key_is_redacted(self):
+        text = 'OPENAI_API_KEY = "sk-abcdefghijklmnopqrstuvwx"\n'
+        evidence = _line_evidence_text(text, text.index("OPENAI"))
+        self.assertNotIn("sk-abcdefghijklmnopqrstuvwx", evidence)
+        self.assertIn("[REDACTED]", evidence)
+
+    def test_password_assignment_is_redacted(self):
+        text = 'PASSWORD = "hunter2-super-secret"\n'
+        evidence = _line_evidence_text(text, 0)
+        self.assertNotIn("hunter2-super-secret", evidence)
+        self.assertIn("[REDACTED]", evidence)
+
+    def test_aws_key_on_control_matching_line_is_redacted(self):
+        text = "client = boto3.client('s3', aws_access_key_id='AKIAABCDEFGHIJKLMNOP')\n"
+        evidence = _line_evidence_text(text, 0)
+        self.assertNotIn("AKIAABCDEFGHIJKLMNOP", evidence)
 
 
 if __name__ == "__main__":

@@ -39,6 +39,7 @@ from .ai_discovery import AIFinding, DiscoveryResult, MAX_FILE_BYTES, _iter_cand
 from .attack_surface import AttackSurfaceResult
 from .dataflow import MAX_DATAFLOW_LINE_DISTANCE, DataFlowGraph, DataFlowObservation
 from .exclusion_policy import safe_regular_file_size, walk_pruned
+from .security_utils import redact_secrets
 
 STATUS_DETECTED = "DETECTED"
 STATUS_PARTIAL = "PARTIAL"
@@ -190,7 +191,7 @@ def _line_evidence_text(text: str, start: int) -> str:
     line_end = text.find("\n", start)
     if line_end == -1:
         line_end = len(text)
-    evidence = text[line_start:line_end].strip()
+    evidence = redact_secrets(text[line_start:line_end].strip())
     if len(evidence) > 160:
         evidence = evidence[:157] + "..."
     return evidence
