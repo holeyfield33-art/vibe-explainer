@@ -12,24 +12,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-SKIP_DIRS = {
-    ".git",
-    "node_modules",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "dist",
-    "build",
-    ".next",
-    "target",
-    ".tox",
-    ".mypy_cache",
-    ".pytest_cache",
-    "coverage",
-    ".coverage",
-    "vendor",
-    "third_party",
-}
+from .exclusion_policy import EXCLUDED_DIR_NAMES, safe_regular_file_size, walk_pruned
+
+# Re-exported for backward compatibility (controls.py and readiness.py import this
+# name) and so it can never silently drift from exclusion_policy's set again —
+# this used to be its own separately-maintained list, missing several entries
+# (.hg, .svn, third_party, site-packages, .ruff_cache) that exclusion_policy had.
+SKIP_DIRS = EXCLUDED_DIR_NAMES
 
 CODE_EXTS = {
     ".py",
@@ -121,13 +110,14 @@ class ScanResult:
         }
 
 
-def _should_skip_dir(name: str) -> bool:
-    return name in SKIP_DIRS or name.startswith(".")
-
-
 def _count_lines(path: Path) -> int:
     try:
-        with path.open("rb") as f:
+        flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(path, flags)
+    except OSError:
+        return 0
+    try:
+        with os.fdopen(fd, "rb") as f:
             # cheap line count; ignore decode errors
             return sum(1 for _ in f)
     except OSError:
@@ -144,10 +134,7 @@ def scan_repo(root: str | Path, max_files: int = 5000) -> ScanResult:
     dir_counts: dict[str, int] = defaultdict(int)
     files: list[FileInfo] = []
 
-    for dirpath, dirnames, filenames in os.walk(root_path):
-        # prune in-place
-        dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
-
+    for dirpath, dirnames, filenames in walk_pruned(root_path):
         rel_dir = os.path.relpath(dirpath, root_path)
         if rel_dir == ".":
             rel_dir = ""
@@ -171,9 +158,8 @@ def scan_repo(root: str | Path, max_files: int = 5000) -> ScanResult:
             if ext not in CODE_EXTS:
                 continue
 
-            try:
-                size = full.stat().st_size
-            except OSError:
+            size = safe_regular_file_size(full)
+            if size is None:
                 continue
             if size > 2_000_000:  # skip huge files (same spirit as vibe-check)
                 continue

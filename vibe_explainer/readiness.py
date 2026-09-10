@@ -18,7 +18,6 @@ directories, CI config, documentation headers) that Phases 1-5 have no reason to
 from __future__ import annotations
 
 import hashlib
-import os
 import re
 import stat
 from dataclasses import dataclass, field
@@ -33,8 +32,8 @@ from .controls import (
     ControlAssessment,
 )
 from .dataflow import DataFlowGraph
+from .exclusion_policy import safe_regular_file_size, walk_pruned
 from .risk import COMPLETENESS_AGGREGATED, COMPLETENESS_PARTIAL, RiskAssessment
-from .scanner import SKIP_DIRS
 
 STATUS_ACHIEVED = "ACHIEVED"
 STATUS_PARTIAL = "PARTIAL"
@@ -91,21 +90,13 @@ class _ProcessEvidence:
     description: str
 
 
-def _should_skip_dir(name: str) -> bool:
-    # Only prune SKIP_DIRS exactly (which already includes ".git") — do NOT use a
-    # startswith(".git") check, since that would also match ".github" and silently
-    # hide .github/workflows/ from the CI-config scan.
-    return name in SKIP_DIRS
-
-
 def _iter_all_repo_paths(root_path: Path):
-    """Yield regular repository files without following file symlinks.
+    """Yield regular repository files without following file or directory symlinks.
 
     Streaming avoids retaining an attacker-controlled path list in memory. The
     shared bounded reader performs a second no-follow check before content reads.
     """
-    for dirpath, dirnames, filenames in os.walk(root_path):
-        dirnames[:] = [d for d in dirnames if not _should_skip_dir(d)]
+    for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
             path = Path(dirpath) / name
             try:
@@ -150,10 +141,8 @@ def _scan_process_signals(root_path: Path) -> ProcessSignals:
         if not (is_ci or is_doc):
             continue
 
-        try:
-            if file_path.stat().st_size > MAX_FILE_BYTES:
-                continue
-        except OSError:
+        size = safe_regular_file_size(file_path)
+        if size is None or size > MAX_FILE_BYTES:
             continue
         text = _read_text(file_path)
         if text is None:
