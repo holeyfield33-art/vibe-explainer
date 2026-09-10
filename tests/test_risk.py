@@ -211,6 +211,38 @@ class TestTruncatedDiscovery(unittest.TestCase):
         self.assertEqual(assessment.assessment_completeness, COMPLETENESS_COMPLETE)
 
 
+class TestCoverageGapCompleteness(unittest.TestCase):
+    # Issue #20/#21/#9: a genuine coverage gap (file skipped for size, file
+    # unreadable, or a global scan budget hit) must force PARTIAL even when
+    # nothing was truncated — a real gap is worse than a summarized-but-fully-
+    # counted repeat, and must never be reported as COMPLETE or AGGREGATED.
+
+    def _assess_with_gap(self, **gap_kwargs):
+        discovery = discover_ai(FIXTURES / "basic-chatbot")
+        for key, value in gap_kwargs.items():
+            setattr(discovery, key, value)
+        surface = build_attack_surface(discovery)
+        graph = build_dataflow(discovery)
+        controls = assess_controls(discovery, surface, graph)
+        return assess_risks(discovery, surface, graph, controls)
+
+    def test_partial_when_files_skipped_for_size(self):
+        assessment = self._assess_with_gap(files_skipped_size=1)
+        self.assertEqual(assessment.assessment_completeness, COMPLETENESS_PARTIAL)
+
+    def test_partial_when_files_unreadable(self):
+        assessment = self._assess_with_gap(files_unreadable=1)
+        self.assertEqual(assessment.assessment_completeness, COMPLETENESS_PARTIAL)
+
+    def test_partial_when_budget_exhausted(self):
+        assessment = self._assess_with_gap(budget_exhausted=True)
+        self.assertEqual(assessment.assessment_completeness, COMPLETENESS_PARTIAL)
+
+    def test_partial_summary_note_uses_lower_bound_language(self):
+        assessment = self._assess_with_gap(files_unreadable=1)
+        self.assertIn("lower bound", assessment.summary_note)
+
+
 class TestFalsePositiveProtection(unittest.TestCase):
     def test_bare_llm_import_alone_does_not_create_critical_risk(self):
         # controls-docs has AI usage but no sinks, no prompt chain, no tools

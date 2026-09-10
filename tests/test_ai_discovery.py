@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 import os
 import tempfile
 from pathlib import Path
@@ -266,6 +267,51 @@ class TestUntrustedFilesystemSafety(unittest.TestCase):
 
             self.assertEqual(result.findings, [])
             self.assertEqual(result.files_scanned, 0)
+            self.assertEqual(result.files_unreadable, 1)
+            self.assertTrue(result.has_coverage_gap())
+
+
+class TestCoverageBudgets(unittest.TestCase):
+    # Issue #21/#9: global scan budgets on file count / total bytes / elapsed
+    # time, and a loud count of *why* a candidate was never examined, rather
+    # than an unbounded walk that could exhaust memory/time on a hostile or
+    # accidental huge tree.
+
+    def test_oversized_file_counted_not_silently_dropped(self):
+        import vibe_explainer.ai_discovery as ai_discovery_module
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            big = Path(root_dir) / "huge.py"
+            big.write_text("x = 1\n" * 1000)
+
+            with unittest.mock.patch.object(ai_discovery_module, "MAX_FILE_BYTES", 10):
+                result = discover_ai(root_dir)
+
+            self.assertEqual(result.files_scanned, 0)
+            self.assertEqual(result.files_skipped_size, 1)
+            self.assertTrue(result.has_coverage_gap())
+
+    def test_file_count_budget_stops_scan_and_marks_exhausted(self):
+        import vibe_explainer.ai_discovery as ai_discovery_module
+
+        with tempfile.TemporaryDirectory() as root_dir:
+            for i in range(5):
+                (Path(root_dir) / f"f{i}.py").write_text("x = 1\n")
+
+            with unittest.mock.patch.object(ai_discovery_module, "MAX_FILES_SCANNED", 2):
+                result = discover_ai(root_dir)
+
+            self.assertLessEqual(result.files_scanned, 2)
+            self.assertTrue(result.budget_exhausted)
+            self.assertIn("file count budget", result.budget_exhausted_reason)
+            self.assertTrue(result.has_coverage_gap())
+
+    def test_no_gap_reported_when_nothing_skipped(self):
+        result = discover_ai(SAMPLE_NO_AI)
+        self.assertFalse(result.has_coverage_gap())
+        self.assertEqual(result.files_skipped_size, 0)
+        self.assertEqual(result.files_unreadable, 0)
+        self.assertFalse(result.budget_exhausted)
 
 
 class TestEarlyEvidenceRedaction(unittest.TestCase):

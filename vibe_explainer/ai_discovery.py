@@ -17,6 +17,7 @@ import hashlib
 import os
 import re
 import stat
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,15 @@ SCAN_EXTS = {
 
 MAX_FILE_BYTES = 500_000  # skip anything larger; not built to profile huge files
 MAX_FINDINGS_PER_FILE_PATTERN = 3  # cap repeated hits so one noisy file doesn't dominate
+
+# Global scan budgets (issue #21/#9): without these, a hostile or accidental
+# tree of tens of thousands of tiny files can exhaust memory/time on the scan
+# host. Hitting any of these stops the walk early rather than running
+# unbounded — the caller is told via budget_exhausted so completeness can be
+# marked PARTIAL instead of silently claiming full coverage.
+MAX_FILES_SCANNED = 20_000
+MAX_TOTAL_BYTES = 200_000_000
+MAX_SCAN_SECONDS = 120.0
 
 Confidence = str  # "high" | "moderate" | "low"
 
@@ -120,6 +130,14 @@ class DiscoveryResult:
     # regex import resolution). Only repo-internal imports appear here; external
     # packages are excluded. Used to build cross-file dataflow edges.
     imports_by_file: dict[str, list[str]] = field(default_factory=dict)
+    # Coverage-gap counters (issue #20/#21/#9): a candidate file that was in
+    # scope but never examined, distinct from "no evidence found in an examined
+    # file". Any of these being non-zero means completeness must be PARTIAL,
+    # not COMPLETE — see risk.py's assessment_completeness computation.
+    files_skipped_size: int = 0
+    files_unreadable: int = 0
+    budget_exhausted: bool = False
+    budget_exhausted_reason: str | None = None
 
     def by_category(self) -> dict[str, list[AIFinding]]:
         out: dict[str, list[AIFinding]] = {}
@@ -130,6 +148,9 @@ class DiscoveryResult:
     def has_ai_signal(self) -> bool:
         return len(self.findings) > 0
 
+    def has_coverage_gap(self) -> bool:
+        return self.files_skipped_size > 0 or self.files_unreadable > 0 or self.budget_exhausted
+
     def to_dict(self) -> dict[str, Any]:
         by_cat = self.by_category()
         return {
@@ -139,6 +160,10 @@ class DiscoveryResult:
             "findings": [f.to_dict() for f in self.findings],
             "summary": {cat: len(items) for cat, items in by_cat.items()},
             "truncated": [t.to_dict() for t in self.truncated],
+            "files_skipped_size": self.files_skipped_size,
+            "files_unreadable": self.files_unreadable,
+            "budget_exhausted": self.budget_exhausted,
+            "budget_exhausted_reason": self.budget_exhausted_reason,
         }
 
 
@@ -252,19 +277,27 @@ def _iter_candidate_files(root_path: Path):
             yield full
 
 
-def _read_text(path: Path) -> str | None:
+def _read_text_with_reason(path: Path) -> tuple[str | None, str | None]:
     """Read one bounded regular file without following a final symlink.
 
     Repositories are untrusted input. Refusing symlinks and special files prevents
     out-of-scope reads and blocking on FIFOs/devices. ``O_NOFOLLOW`` also closes the
     common check/open race on platforms that provide it.
+
+    Returns ``(text, None)`` on success, or ``(None, reason)`` where ``reason`` is
+    ``"oversized"`` (skipped by size, not a coverage failure of the file itself) or
+    ``"unreadable"`` (not a regular file, or a genuine read/stat failure) — so the
+    caller can count *why* a candidate was never examined instead of only knowing
+    that it wasn't.
     """
     try:
         metadata = path.lstat()
-        if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_FILE_BYTES:
-            return None
     except OSError:
-        return None
+        return None, "unreadable"
+    if not stat.S_ISREG(metadata.st_mode):
+        return None, "unreadable"
+    if metadata.st_size > MAX_FILE_BYTES:
+        return None, "oversized"
     try:
         flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
         fd = os.open(path, flags)
@@ -281,10 +314,15 @@ def _read_text(path: Path) -> str | None:
         finally:
             os.close(fd)
         if len(data) > MAX_FILE_BYTES:
-            return None
-        return data.decode("utf-8", errors="ignore")
+            return None, "oversized"
+        return data.decode("utf-8", errors="ignore"), None
     except OSError:
-        return None
+        return None, "unreadable"
+
+
+def _read_text(path: Path) -> str | None:
+    text, _reason = _read_text_with_reason(path)
+    return text
 
 
 def discover_ai(root: str | Path) -> DiscoveryResult:
@@ -311,10 +349,31 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
     _CONFIDENCE_PRIORITY = {"high": 3, "moderate": 2, "low": 1}
     file_texts: dict[str, str] = {}  # rel -> content, for Phase 8G import resolution
 
+    start_time = time.monotonic()
+    total_bytes_read = 0
+
     for file_path in _iter_candidate_files(root_path):
-        text = _read_text(file_path)
+        if result.files_scanned >= MAX_FILES_SCANNED:
+            result.budget_exhausted = True
+            result.budget_exhausted_reason = f"file count budget ({MAX_FILES_SCANNED}) reached"
+            break
+        if total_bytes_read >= MAX_TOTAL_BYTES:
+            result.budget_exhausted = True
+            result.budget_exhausted_reason = f"total byte budget ({MAX_TOTAL_BYTES}) reached"
+            break
+        if time.monotonic() - start_time > MAX_SCAN_SECONDS:
+            result.budget_exhausted = True
+            result.budget_exhausted_reason = f"time budget ({MAX_SCAN_SECONDS}s) reached"
+            break
+
+        text, skip_reason = _read_text_with_reason(file_path)
         if text is None:
+            if skip_reason == "oversized":
+                result.files_skipped_size += 1
+            else:
+                result.files_unreadable += 1
             continue
+        total_bytes_read += len(text)
         result.files_scanned += 1
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
         file_texts[rel] = text
