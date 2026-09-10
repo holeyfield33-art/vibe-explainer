@@ -56,6 +56,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .ai_discovery import AIFinding, DiscoveryResult
+from .security_utils import redact_secrets
 
 # Proximity threshold: two findings farther apart than this (same file) are not
 # considered for a relationship at all — this is the line between "moderate
@@ -121,6 +122,13 @@ class DataFlowObservation:
     resolution_method: str = "SAME_FILE"  # Phase 8G: SAME_FILE | IMPORT
     source_file: str = ""  # populated for cross-file edges
     destination_file: str = ""
+
+    def __post_init__(self) -> None:
+        # Guaranteed redaction at construction, not left to whichever call
+        # site happens to remember it — evidence strings are built from
+        # finding names/categories today but this must hold even if a future
+        # caller passes through raw source text.
+        self.evidence = redact_secrets(self.evidence)
 
     def to_dict(self) -> dict[str, Any]:
         return {
