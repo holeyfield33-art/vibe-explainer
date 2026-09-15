@@ -1,17 +1,10 @@
-"""Map a Vibe Explainer security report onto the Agent Security Index (ASI).
+"""Deterministically map Vibe Explainer evidence onto Agent Security Index rows.
 
-This module is intentionally a bridge, not a second scanner and not an attack detector.
-It consumes two already-produced artifacts:
-
-1. a ``VibeExplainerReport`` containing repository evidence; and
-2. a local ASI machine-readable export (combined JSON, attack-class JSON, or export dir).
-
-The output answers: "which ASI rows are relevant to the observed repository surface,
-what Vibe evidence is related to those rows, and what repository evidence exists for
-mitigations Vibe knows how to recognize?"
-
-It does *not* claim exploitability, attack presence, mitigation effectiveness, or ASI
-validation. Missing evidence remains missing evidence.
+This is a bridge layer, not a second scanner. It consumes an already-built
+``VibeExplainerReport`` plus a *local* ASI export and reports row relevance,
+related Vibe evidence, and repository evidence for mitigations Vibe knows how
+to recognize. It never claims exploitability, attack presence, mitigation
+effectiveness, or ASI validation.
 """
 
 from __future__ import annotations
@@ -20,13 +13,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 SCHEMA_VERSION = "1.0"
 
-# Narrow, auditable bridges from Vibe's existing control evidence to mitigation IDs
-# used by Agent Security Index. A mapping means "this Vibe control can provide some
-# repository evidence relevant to this mitigation" -- never that the mitigation is
-# validated or fully implemented.
+# Vibe control -> ASI mitigation evidence bridges. These mean only that a Vibe
+# control can provide repository evidence relevant to the mitigation.
 _CONTROL_TO_ASI_MITIGATIONS: dict[str, tuple[str, ...]] = {
     "C03": ("untrusted-io", "schema-gov"),
     "C04": ("output-dlp", "schema-gov"),
@@ -40,8 +30,8 @@ _CONTROL_TO_ASI_MITIGATIONS: dict[str, tuple[str, ...]] = {
     "C12": ("tool-sandbox", "hitl", "least-privilege"),
 }
 
-# Only direct evidence bridges are listed. Vibe may consider many more ASI rows
-# relevant by protocol, but it must not manufacture an attack-specific mapping.
+# Keep attack-specific bridges deliberately narrow. Protocol relevance can make
+# many more rows applicable, but unsupported rows must remain unassessed.
 _RISK_CATEGORY_TO_AAC: dict[str, tuple[str, ...]] = {
     "INPUT_SECURITY": ("AAC-01",),
     "RAG_SECURITY": ("AAC-02",),
@@ -69,39 +59,59 @@ def _load_json(path: Path) -> Any:
 
 
 def _extract_attack_classes(payload: Any) -> list[dict[str, Any]]:
-    """Accept current ASI export shapes without coupling to its frontend source."""
     if isinstance(payload, list):
-        rows = [row for row in payload if isinstance(row, dict) and str(row.get("id", "")).startswith("AAC-")]
-        return rows
-
+        return [
+            row for row in payload
+            if isinstance(row, dict) and str(row.get("id", "")).startswith("AAC-")
+        ]
     if not isinstance(payload, dict):
         return []
 
     for key in ("attackClasses", "attack_classes", "classes"):
         rows = payload.get(key)
         if isinstance(rows, list):
-            extracted = _extract_attack_classes(rows)
-            if extracted:
-                return extracted
-
+            found = _extract_attack_classes(rows)
+            if found:
+                return found
     for key in ("catalog", "data", "matrix"):
-        nested = payload.get(key)
-        extracted = _extract_attack_classes(nested)
-        if extracted:
-            return extracted
-
+        found = _extract_attack_classes(payload.get(key))
+        if found:
+            return found
     return []
 
 
-def load_asi_catalog(path: str | Path) -> dict[str, Any]:
-    """Load an ASI export from a directory or JSON file.
+def _extract_metadata(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        return {}
+    # ASI's generated combined snapshot uses `catalog`; accept older/generic
+    # aliases too so Vibe does not couple to frontend internals.
+    for key in ("catalog", "meta", "metadata"):
+        value = payload.get(key)
+        if isinstance(value, dict):
+            return value
+    return {}
 
-    Directory mode prefers ``asi-catalog.json`` when it exists; otherwise it joins
-    ``attack-classes*.json`` fragments in lexical order. This preserves Vibe's
-    offline/deterministic design: no network fetch occurs here.
+
+def _normalize_class(row: dict[str, Any]) -> dict[str, Any]:
+    out = dict(row)
+    # JSON chunks historically used proposedMitigationIds; the current TS-derived
+    # combined export uses mitigations. Normalize once at the boundary.
+    if "proposedMitigationIds" not in out and isinstance(out.get("mitigations"), list):
+        out["proposedMitigationIds"] = list(out["mitigations"])
+    return out
+
+
+def load_asi_catalog(path: str | Path) -> dict[str, Any]:
+    """Load a local ASI export directory or JSON file; never fetch the network.
+
+    Directory mode prefers a generated ``asi-catalog.json``. If it is absent,
+    split ``attack-classes*.json`` files are accepted only when their observed
+    count matches ``catalog-meta.json.classCount`` (when declared). This prevents
+    a stale partial export from silently becoming a partial customer matrix.
     """
     source = Path(path)
     metadata: dict[str, Any] = {}
+    classes: list[dict[str, Any]] = []
 
     if source.is_dir():
         meta_path = source / "catalog-meta.json"
@@ -114,25 +124,16 @@ def load_asi_catalog(path: str | Path) -> dict[str, Any]:
         if combined.is_file():
             payload = _load_json(combined)
             classes = _extract_attack_classes(payload)
-            if not metadata and isinstance(payload, dict):
-                for key in ("meta", "metadata"):
-                    if isinstance(payload.get(key), dict):
-                        metadata = payload[key]
-                        break
+            metadata = metadata or _extract_metadata(payload)
         else:
-            classes = []
-            fragments = sorted(source.glob("attack-classes*.json"))
-            for fragment in fragments:
+            for fragment in sorted(source.glob("attack-classes*.json")):
                 classes.extend(_extract_attack_classes(_load_json(fragment)))
     else:
         payload = _load_json(source)
         classes = _extract_attack_classes(payload)
-        if isinstance(payload, dict):
-            for key in ("meta", "metadata"):
-                if isinstance(payload.get(key), dict):
-                    metadata = payload[key]
-                    break
+        metadata = _extract_metadata(payload)
 
+    classes = [_normalize_class(row) for row in classes]
     if not classes:
         raise ValueError(
             "No AAC attack classes found. Provide an ASI export directory, "
@@ -144,18 +145,21 @@ def load_asi_catalog(path: str | Path) -> dict[str, Any]:
     if duplicates:
         raise ValueError(f"Duplicate ASI attack-class IDs: {', '.join(duplicates)}")
 
+    expected_count = metadata.get("classCount") if isinstance(metadata, dict) else None
+    if isinstance(expected_count, int) and expected_count > 0 and len(classes) != expected_count:
+        raise ValueError(
+            f"Incomplete ASI catalog export: metadata declares {expected_count} classes "
+            f"but {len(classes)} were loaded. Run `npm run assemble:catalog` in "
+            "agent-security-index and point Vibe at the generated export."
+        )
+
     classes.sort(key=lambda row: str(row.get("id", "")))
-    return {
-        "metadata": metadata,
-        "classes": classes,
-        "source": str(source),
-    }
+    return {"metadata": metadata, "classes": classes, "source": str(source)}
 
 
 def _detected_protocols(report: Any) -> list[str]:
     protocols: set[str] = set()
     categories = report.ai_inventory.get("categories", {})
-
     if categories.get("ai_usage") or categories.get("tool_agent"):
         protocols.add("Native")
     if categories.get("mcp"):
@@ -163,8 +167,6 @@ def _detected_protocols(report: Any) -> list[str]:
     if categories.get("rag_retrieval"):
         protocols.add("RAG")
 
-    # These protocol forms are less consistently represented as dedicated discovery
-    # categories today, so use already-redacted inventory text as a conservative hint.
     searchable: list[str] = []
     for items in categories.values():
         for item in items:
@@ -176,7 +178,6 @@ def _detected_protocols(report: Any) -> list[str]:
         protocols.add("ANP")
     if "skill" in joined:
         protocols.add("Skills")
-
     return sorted(protocols)
 
 
@@ -190,7 +191,6 @@ def _control_statuses(report: Any) -> dict[str, dict[str, Any]]:
                     "status": status,
                     "name": control.get("name"),
                     "confidence": control.get("confidence"),
-                    "evidence": control.get("evidence", []),
                 }
     return result
 
@@ -203,10 +203,12 @@ def _mitigation_to_controls() -> dict[str, list[str]]:
     return result
 
 
-def _best_control_status(control_ids: list[str], controls: dict[str, dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
-    evidence: list[dict[str, Any]] = []
+def _best_control_status(
+    control_ids: list[str], controls: dict[str, dict[str, Any]]
+) -> tuple[str, list[dict[str, Any]]]:
     best = "UNASSESSED"
     best_rank = _STATUS_RANK[best]
+    evidence: list[dict[str, Any]] = []
     for control_id in control_ids:
         control = controls.get(control_id)
         if not control:
@@ -232,8 +234,7 @@ def _risk_rows_for_class(report: Any, class_id: str, relevant: bool) -> list[dic
         category = str(scenario.get("category", ""))
         if class_id not in _RISK_CATEGORY_TO_AAC.get(category, ()):
             continue
-        # AAC-16 is specifically MCP STDIO. A generic high-impact-action path should
-        # only bridge there when an MCP surface was actually observed.
+        # AAC-16 specifically concerns MCP STDIO; a generic shell path is not enough.
         if class_id == "AAC-16" and not relevant:
             continue
         mapped.append(
@@ -251,14 +252,13 @@ def _risk_rows_for_class(report: Any, class_id: str, relevant: bool) -> list[dic
 
 
 def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
-    """Map a completed Vibe security report to every published ASI attack class."""
+    """Map one completed Vibe security report to every loaded ASI class."""
     protocols = _detected_protocols(report)
     protocol_set = set(protocols)
     controls = _control_statuses(report)
     mitigation_controls = _mitigation_to_controls()
     ai_surface_detected = report.executive_summary.get("ai_surface") == "DETECTED"
 
-    rows: list[dict[str, Any]] = []
     counts = {
         "EVIDENCE_CHAIN": 0,
         "CONTROL_GAP": 0,
@@ -266,6 +266,7 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
         "RELEVANT_UNASSESSED": 0,
         "NOT_OBSERVED": 0,
     }
+    rows: list[dict[str, Any]] = []
 
     for attack_class in catalog["classes"]:
         class_id = str(attack_class.get("id", ""))
@@ -280,8 +281,9 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
         proposed = [str(mid) for mid in attack_class.get("proposedMitigationIds", [])]
         mitigation_evidence: list[dict[str, Any]] = []
         for mitigation_id in proposed:
-            mapped_controls = mitigation_controls.get(mitigation_id, [])
-            status, control_evidence = _best_control_status(mapped_controls, controls)
+            status, control_evidence = _best_control_status(
+                mitigation_controls.get(mitigation_id, []), controls
+            )
             mitigation_evidence.append(
                 {
                     "mitigation_id": mitigation_id,
@@ -291,15 +293,15 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
                 }
             )
 
-        assessed_mitigations = [m for m in mitigation_evidence if m["evidence_status"] != "UNASSESSED"]
-        has_gap = any(m["evidence_status"] == "NOT_DETECTED" for m in assessed_mitigations)
-        has_control_evidence = any(m["evidence_status"] in {"DETECTED", "PARTIAL"} for m in assessed_mitigations)
+        assessed = [m for m in mitigation_evidence if m["evidence_status"] != "UNASSESSED"]
+        has_gap = any(m["evidence_status"] == "NOT_DETECTED" for m in assessed)
+        has_control = any(m["evidence_status"] in {"DETECTED", "PARTIAL"} for m in assessed)
 
         if mapped_risks:
             status = "EVIDENCE_CHAIN"
         elif relevant and has_gap:
             status = "CONTROL_GAP"
-        elif relevant and has_control_evidence:
+        elif relevant and has_control:
             status = "CONTROL_EVIDENCE"
         elif relevant:
             status = "RELEVANT_UNASSESSED"
@@ -311,7 +313,7 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
             {
                 "id": class_id,
                 "name": attack_class.get("name"),
-                "family": attack_class.get("family"),
+                "family": attack_class.get("family") or attack_class.get("vector"),
                 "protocols": class_protocols,
                 "matched_protocols": matched_protocols,
                 "evidence_tier": attack_class.get("evidenceTier"),
@@ -336,10 +338,7 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
         "catalog_version": metadata.get("version") if isinstance(metadata, dict) else None,
         "catalog_status": metadata.get("status") if isinstance(metadata, dict) else None,
         "detected_protocols": protocols,
-        "summary": {
-            "class_count": len(rows),
-            **counts,
-        },
+        "summary": {"class_count": len(rows), **counts},
         "classes": rows,
         "limitations": [
             "This is a static repository-evidence mapping, not runtime attack detection.",
