@@ -7,6 +7,15 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Remove numeric scores, severity bands, and awarded readiness levels from default
+  terminal, JSON, Markdown, and ASI output. Default concerns now expose evidence class,
+  evidence strength, static reachability, and unresolved assumptions; process artifacts
+  are an unscored checklist with enforcement fixed to `UNKNOWN` for offline review.
+- Retain the legacy formula and four-level policy only behind
+  `--experimental-scoring`, with explicit uncalibrated-research warnings.
+- Require nontrivial executable assertions for security-test process evidence; require CI
+  commands to reference existing test paths without obvious failure suppression; reject
+  empty evidence files; and exclude generated reports and the active output destination.
 - Consolidate the product identity on **Vibe Explainer**, make the static AI repository
   evidence review the default CLI behavior, move the deprecated orientation report behind
   `--legacy-mental-model`, and remove the dead `--offline` flag.

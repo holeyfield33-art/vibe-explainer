@@ -64,11 +64,17 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         _render_limitations(add, report)
         return "\n".join(lines)
 
-    highest = es["highest_risk_severity"]
-    level = es["readiness_level"]
+    experimental = bool(m.get("experimental_scoring_enabled"))
+    highest = es.get("highest_risk_severity")
+    level = es.get("readiness_level")
+    scenario_mode = "experimental scored" if experimental else "unscored"
     add(f"Supported AI-related repository evidence was detected. The current heuristic policy "
-        f"generated **{es['risk_scenario_count']} concern scenario(s)**"
-        + (f", the highest experimental severity label being **{_SEVERITY_LABEL.get(highest, highest)}**." if highest else ".")
+        f"generated **{es['risk_scenario_count']} {scenario_mode} concern scenario(s)**"
+        + (
+            f", with the highest opt-in experimental severity label being "
+            f"**{_SEVERITY_LABEL.get(highest, highest)}**."
+            if experimental and highest else "."
+        )
         )
     add("")
     add(f"Of **{es['total_findings']}** AI-relevant findings, **{es['production_findings']}** "
@@ -82,12 +88,17 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             "as production by conservative default because no stronger path or content signal "
             "was available. Confirm these classifications during analyst review.")
         add("")
-    add("The experimental process-evidence policy produced "
-        f"**Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**. This is a "
-        "repository-signal classification, not a measurement or certification of security maturity.")
-    add("")
-    add("Concern severity and process-evidence classification are independent heuristic outputs. "
-        "Neither confirms exploitability, control effectiveness, or the operation of a security process.")
+    if experimental:
+        add("The opt-in experimental process policy produced "
+            f"**Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**. This is a "
+            "repository-signal classification, not a measurement or certification of security maturity.")
+        add("")
+    else:
+        add("Process artifacts are reported as an **unscored checklist**. Runtime execution, "
+            "enforcement, and effectiveness remain **UNKNOWN** in this offline review.")
+        add("")
+    add("Concern evidence and process-artifact observations are independent. Neither confirms "
+        "exploitability, control effectiveness, or the operation of a security process.")
     add("")
     if m["assessment_completeness"] == "PARTIAL":
         add("> ⚠️ **This assessment is INCOMPLETE.** Some files could not be assessed, so the "
@@ -163,40 +174,44 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("---")
     add("")
 
-    # ---- Key risks --------------------------------------------------------
-    add("## Key Risks")
+    # ---- Concern scenarios ------------------------------------------------
+    add("## Concern Scenarios")
     add("")
-    add("For compatibility, each scenario currently includes an **uncalibrated experimental** "
-        f"1–25 score using `{_pb.RISK_FORMULA}`. The values are deterministic policy outputs, "
-        "not measured probabilities or validated vulnerability severities:")
-    add("")
-    add("| Score | Severity | Playbook readiness |")
-    add("|---|---|---|")
-    for rng, sev, rd in _pb.risk_band_table_rows():
-        add(f"| {rng} | {sev} | {rd} |")
-    add("")
-    dist = report.risks["by_severity"]
-    add(f"**{report.risks['total']} scenario(s)** — "
-        f"Critical: {dist.get('CRITICAL', 0)}, High: {dist.get('HIGH', 0)}, "
-        f"Moderate: {dist.get('MODERATE', 0)}, Low: {dist.get('LOW', 0)}.")
+    if experimental:
+        add("The explicit experimental option includes an **uncalibrated** 1–25 formula. "
+            "These values are deterministic policy outputs, not measured probabilities or "
+            "validated vulnerability severities.")
+        add("")
+        add(f"Formula: `{_pb.RISK_FORMULA}`")
+        add("")
+        add("| Score | Severity | Playbook readiness |")
+        add("|---|---|---|")
+        for score_range, severity, readiness_label in _pb.risk_band_table_rows():
+            add(f"| {score_range} | {severity} | {readiness_label} |")
+    else:
+        add("Scenarios are intentionally unscored. Prioritize them through analyst review of "
+            "evidence strength, structural reachability, context, and unresolved assumptions.")
     add("")
     if report.risks["scenarios"]:
         for s in report.risks["scenarios"]:
-            add(f"### [{_SEVERITY_LABEL.get(s['severity'], s['severity'])}] {s['title']}")
+            prefix = f"[{_SEVERITY_LABEL.get(s['severity'], s['severity'])}] " if experimental else ""
+            add(f"### {prefix}{s['title']}")
             add("")
-            add(f"- **Risk ID:** `{s['risk_id']}`")
+            add(f"- **Concern ID:** `{s['risk_id']}`")
             add(f"- **Category:** {s['category']}")
-            add(f"- **Score:** {s['score']} / 25 ({s['severity']})")
-            # Playbook factor breakdown, shown as the formula with this scenario's inputs.
-            if s.get("exposure") is not None:
+            add(f"- **Evidence strength:** {s['evidence_strength']}")
+            add(f"- **Evidence class:** {', '.join(s['evidence_class']) or 'UNSPECIFIED'}")
+            add(f"- **Reachability:** {s['reachability_status']}")
+            if experimental:
+                add(f"- **Experimental score:** {s['score']} / 25 ({s['severity']})")
                 e, sa, se, lk = s["exposure"], s["safety_impact"], s["security_exposure"], s["likelihood"]
-                add(f"- **Risk factors (playbook):** Exposure {e}, Safety {sa}, "
+                add(f"- **Risk factors (playbook):** Experimental inputs — Exposure {e}, Safety {sa}, "
                     f"Security {se}, Likelihood {lk} → ROUND(((({e}+{sa}+{se})/3) × {lk})) = {s['score']}")
-            if s.get("context_adjusted"):
+            if experimental and s.get("context_adjusted"):
                 add(f"- **Context adjustment:** severity capped — this scenario is driven "
                     f"entirely by `{s.get('primary_context', 'non-production')}` code, not "
                     f"production code. The raw score reflects the pattern as if in production.")
-            add(f"- **Assessment confidence:** {s['confidence']}")
+            add("- **Unresolved assumptions:** " + " ".join(s["unresolved_assumptions"]))
             add("")
             add(f"{s['rationale']}")
             add("")
@@ -239,32 +254,33 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("---")
     add("")
 
-    # ---- Readiness --------------------------------------------------------
-    add("## Experimental Process-Evidence Classification")
+    # ---- Process evidence -------------------------------------------------
+    add("## Process-Evidence Checklist")
     add("")
-    add("This four-level policy uses repository paths, headers, CI keywords, and control-artifact "
-        "signals. It does not verify that a process runs, is enforced, or is effective.")
-    add("")
-    lvl_meta = _pb.level_meta(level)
-    add(f"**Current experimental policy output: Level {level} — {lvl_meta['name']}**")
-    add("")
-    if lvl_meta["goal"]:
+    if experimental:
+        lvl_meta = _pb.level_meta(level)
+        add(f"**Opt-in experimental policy output: Level {level} — {lvl_meta['name']}**")
+        add("")
         add(f"- **Level goal (playbook):** {lvl_meta['goal']}")
         add(f"- **Testing posture:** {lvl_meta['posture']}")
         add(f"- **Typical platform at this level:** {_pb.platform_archetype(level)}")
         add("")
-    blocked = report.readiness.get("blocked_from_next_level")
-    if blocked:
-        add(f"**Blocked from the next level by:** {blocked}")
+        add("| Level | Name | Status | Missing evidence |")
+        add("|---|---|---|---|")
+        for la in report.readiness["level_assessments"]:
+            missing = la["missing_requirements"][0] if la["missing_requirements"] else ""
+            add(f"| {la['level']} | {la['name']} | {la['status']} | {_cell(missing)} |")
         add("")
-    add("| Level | Name | Playbook goal | Status | Notes |")
-    add("|---|---|---|---|---|")
-    for la in report.readiness["level_assessments"]:
-        note = ""
-        if la["status"] != "ACHIEVED" and la["missing_requirements"]:
-            note = la["missing_requirements"][0]
-        meta = _pb.level_meta(la["level"])
-        add(f"| {la['level']} | {meta['name']} | {_cell(meta['goal'])} | {la['status']} | {_cell(note)} |")
+    else:
+        add("Observed repository artifacts are separated from what an offline scan cannot verify. "
+            "An observed artifact never changes enforcement from UNKNOWN.")
+        add("")
+        add("| Check | Artifact status | Enforcement | Missing evidence |")
+        add("|---|---|---|---|")
+        for check in report.readiness["checks"]:
+            missing = check["missing_evidence"][0] if check["missing_evidence"] else ""
+            add(f"| {check['name']} | {check['artifact_status']} | "
+                f"{check['enforcement_status']} | {_cell(missing)} |")
     add("")
     add("---")
     add("")

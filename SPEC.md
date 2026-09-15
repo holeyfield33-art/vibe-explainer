@@ -37,7 +37,8 @@ Every output exposes the applicable subset of:
 5. Static relationship observations with resolution method.
 6. Security-control artifact evidence and explicit status semantics.
 7. Concern scenarios and their underlying assumptions.
-8. Experimental process-evidence classification and its inputs.
+8. An unscored process-evidence checklist separating observed artifacts from unknown
+   enforcement and effectiveness.
 9. Recommendations linked to evidence IDs.
 10. Limitations, coverage gaps, aggregation counts, and unsupported analysis.
 11. Optional ASI mapping with catalog provenance and mapping limitations.
@@ -60,9 +61,9 @@ must preserve references to the complete machine-readable evidence.
   classified context.
 - Unsupported-language lexical leads cannot drive authoritative conclusions.
 
-Numeric scores, severity bands, and four-level process classifications remain experimental
-until independently labelled calibration exists. They must be disclosed as deterministic
-policy outputs wherever displayed and are scheduled for removal from default output.
+Numeric scores, severity bands, and four-level process classifications are absent from
+default output. They remain available only through `--experimental-scoring` for research
+compatibility until independently reviewed calibration exists.
 
 ## Untrusted-repository boundary
 
@@ -81,6 +82,7 @@ vibe-explainer REPO                         terminal evidence review
 vibe-explainer REPO --json                  complete machine-readable review
 vibe-explainer REPO --report -o FILE        detailed analyst-review Markdown
 vibe-explainer REPO --asi-catalog PATH      add local ASI mapping
+vibe-explainer REPO --experimental-scoring  opt into uncalibrated legacy policy output
 vibe-explainer REPO --legacy-mental-model   deprecated orientation report
 ```
 

@@ -83,6 +83,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
+        "--experimental-scoring",
+        action="store_true",
+        help=(
+            "Include the legacy uncalibrated numeric scores, severity bands, and "
+            "four-level process classification. Not suitable for assurance claims."
+        ),
+    )
+    p.add_argument(
         "--version",
         action="version",
         version=f"vibe-explainer {__version__}",
@@ -116,6 +124,7 @@ def _run_security_mode(
     as_consultant: bool,
     out: str | None,
     asi_catalog: str | None = None,
+    experimental_scoring: bool = False,
 ) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
@@ -127,13 +136,31 @@ def _run_security_mode(
     from .security_report import build_report, render_text
 
     try:
-        discovery = discover_ai(repo)
+        excluded_paths: set[str] = set()
+        if out:
+            try:
+                output_rel = Path(out).resolve().relative_to(repo.resolve())
+                excluded_paths.add(str(output_rel).replace("\\", "/"))
+            except ValueError:
+                pass
+
+        discovery = discover_ai(repo, excluded_paths=excluded_paths)
         surface = build_attack_surface(discovery)
         dataflow = build_dataflow(discovery)
         controls = assess_controls(discovery, surface, dataflow)
         risks = assess_risks(discovery, surface, dataflow, controls)
-        readiness = assess_readiness(discovery, surface, dataflow, controls, risks)
-        report = build_report(discovery, surface, dataflow, controls, risks, readiness)
+        readiness = assess_readiness(
+            discovery, surface, dataflow, controls, risks, excluded_paths=excluded_paths
+        )
+        report = build_report(
+            discovery,
+            surface,
+            dataflow,
+            controls,
+            risks,
+            readiness,
+            include_experimental_scoring=experimental_scoring,
+        )
 
         asi_matrix = None
         if asi_catalog:
@@ -183,11 +210,19 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if not args.legacy_mental_model:
-        return _run_security_mode(repo, args.json, args.detailed_report, args.out, args.asi_catalog)
+        return _run_security_mode(
+            repo,
+            args.json,
+            args.detailed_report,
+            args.out,
+            args.asi_catalog,
+            args.experimental_scoring,
+        )
 
-    if args.json or args.detailed_report or args.asi_catalog:
+    if args.json or args.detailed_report or args.asi_catalog or args.experimental_scoring:
         print(
-            "error: --json, --report/--consultant, and --asi-catalog cannot be used "
+            "error: --json, --report/--consultant, --asi-catalog, and "
+            "--experimental-scoring cannot be used "
             "with --legacy-mental-model",
             file=sys.stderr,
         )

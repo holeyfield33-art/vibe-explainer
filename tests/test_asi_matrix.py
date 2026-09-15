@@ -204,6 +204,30 @@ class TestMatrixMapping(unittest.TestCase):
         self.assertEqual(row["attack_detection"], "NOT_PERFORMED")
         self.assertIn("does not prove", row["limitations"])
 
+    def test_unscored_report_does_not_gain_numeric_fields_in_mapping(self):
+        report = self._report()
+        for scenario in report.risks["scenarios"]:
+            scenario.pop("score", None)
+            scenario.pop("severity", None)
+            scenario["evidence_strength"] = scenario.pop("confidence")
+            scenario["evidence_class"] = ["DATAFLOW"]
+            scenario["reachability_status"] = "STATICALLY_INFERRED"
+            scenario["unresolved_assumptions"] = ["Runtime reachability was not tested."]
+        catalog = {
+            "source": "fixture",
+            "metadata": {},
+            "classes": [
+                {"id": "AAC-01", "name": "Direct Prompt Injection", "protocols": ["Native"]}
+            ],
+        }
+
+        result = map_report_to_asi(report, catalog)
+        mapped = result["classes"][0]["mapped_risks"][0]
+
+        self.assertNotIn("score", mapped)
+        self.assertNotIn("severity", mapped)
+        self.assertEqual(mapped["reachability_status"], "STATICALLY_INFERRED")
+
 
 if __name__ == "__main__":
     unittest.main()

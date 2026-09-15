@@ -49,7 +49,10 @@ class TestConsultantReportPlaybookVocabulary(unittest.TestCase):
         c = assess_controls(d, s, g)
         r = assess_risks(d, s, g, c)
         ready = assess_readiness(d, s, g, c, r)
-        return render_consultant_markdown(build_report(d, s, g, c, r, ready), assessment_date="2026-01-01")
+        report = build_report(
+            d, s, g, c, r, ready, include_experimental_scoring=True
+        )
+        return render_consultant_markdown(report, assessment_date="2026-01-01")
 
     def test_cites_framework_by_name(self):
         md = self._md("agent-with-tools")

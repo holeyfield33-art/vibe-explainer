@@ -322,7 +322,11 @@ def _read_text(path: Path) -> str | None:
     return text
 
 
-def discover_ai(root: str | Path) -> DiscoveryResult:
+def discover_ai(
+    root: str | Path,
+    *,
+    excluded_paths: set[str] | frozenset[str] | None = None,
+) -> DiscoveryResult:
     """Scan *root* for content-level evidence of AI components.
 
     Static text matching only. A finding means "this pattern appears in this
@@ -334,6 +338,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
         raise NotADirectoryError(f"Not a directory: {root}")
 
     result = DiscoveryResult(root=str(root_path))
+    excluded = {p.replace("\\", "/").removeprefix("./") for p in (excluded_paths or ())}
     # per-(file, category, name) counter to cap noisy repeats
     seen_counts: dict[tuple[str, str, str], int] = {}
     # (file, category, name) is not a unique key: two different patterns (e.g. a
@@ -350,6 +355,9 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
     total_bytes_read = 0
 
     for file_path in _iter_candidate_files(root_path):
+        rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+        if rel in excluded:
+            continue
         if result.files_scanned >= MAX_FILES_SCANNED:
             result.budget_exhausted = True
             result.budget_exhausted_reason = f"file count budget ({MAX_FILES_SCANNED}) reached"
@@ -372,7 +380,6 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
             continue
         total_bytes_read += len(text)
         result.files_scanned += 1
-        rel = str(file_path.relative_to(root_path)).replace("\\", "/")
         file_texts[rel] = text
         # Classify the file's context once (content-aware), reused for every
         # finding in this file. (Phase 8D)

@@ -18,9 +18,9 @@ relationships, secrets, conclusions, and limitations before sharing it.
 ## Structure
 
 The report contains scope and engine metadata, executive evidence summary, AI inventory,
-attack-surface leads, inferred relationships, concern scenarios, control artifacts,
-experimental process-evidence classification, recommendations, evidence appendix, and
-limitations.
+attack-surface leads, inferred relationships, unscored concern scenarios, control
+artifacts, an unscored process-evidence checklist, recommendations, evidence appendix,
+and limitations.
 
 Every important row carries a finding, relationship, control, or concern ID that can be
 traced to repository evidence. Traceability supports review; it does not convert heuristic
@@ -31,8 +31,8 @@ evidence into proof of exploitability or control effectiveness.
 Some categories and four-level labels use vocabulary adapted from HackerOne's
 "Security for AI: Readiness and Risk Playbook." Vibe Explainer is not a HackerOne
 assessment, endorsed implementation, certification, or validated conformance tool.
-Current numeric scores, severity bands, and process levels are uncalibrated deterministic
-policy outputs and are scheduled for removal from default reporting.
+Numeric scores, severity bands, and process levels are absent from default reporting.
+They are available only through `--experimental-scoring` as uncalibrated research output.
 
 ## Sensitive output
 

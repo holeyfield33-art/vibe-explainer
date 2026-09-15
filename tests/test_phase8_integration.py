@@ -126,7 +126,7 @@ class TestContextAwareRiskWeighting(unittest.TestCase):
 
 
 class TestReadinessSecurityTestCredit(unittest.TestCase):
-    def test_security_test_findings_credit_level_two_gate(self):
+    def test_content_label_without_assertion_does_not_credit_process(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             # a security test by content (path is generic) with a governance control
@@ -147,8 +147,9 @@ class TestReadinessSecurityTestCredit(unittest.TestCase):
             r = assess_risks(d_, s, g, c)
             ready = assess_readiness(d_, s, g, c, r)
             l2 = next(la for la in ready.level_assessments if la.level == 2)
-            # the security-test content should at least engage the L2 gate
-            self.assertNotEqual(l2.status, "NOT_ACHIEVED")
+            # Security-themed content without an executable assertion is not
+            # evidence that a repeatable test process exists.
+            self.assertEqual(l2.status, "NOT_ACHIEVED")
 
 
 class TestASTCrossFileResolution(unittest.TestCase):

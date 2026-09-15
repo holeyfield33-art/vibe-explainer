@@ -15,7 +15,7 @@ the launch gates at the end of this document pass.
   same supported capabilities and non-capabilities.
   Verify: `rg -n "consultant-grade|industry-standard|certif|prove|guarantee|maturity" README.md SPEC.md vibe_explainer docs`
 
-- [ ] **2. Suspend uncalibrated scores and readiness awards by default**
+- [x] **2. Suspend uncalibrated scores and readiness awards by default**
   Issue refs: `#6`, `#8`
   What to build: Make the default report an unscored concern and process-evidence
   checklist. Retain legacy scoring only behind an explicit experimental flag, if at all.

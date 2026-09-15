@@ -33,14 +33,14 @@ _LEVEL_ORDER = (1, 2, 3, 4)
 _NOTABLE_CONTROLS = {"C05", "C08", "C09", "C10", "C12"}
 
 _STANDARD_LIMITATIONS = [
-    "Static, regex/keyword-based analysis only — no AST parsing, no control-flow "
-    "graph, no import-graph resolution.",
-    "Data-flow relationships are same-file only; cross-file flows are not "
-    "established even when clearly implied by imports.",
+    "Static analysis only — general discovery is primarily lexical, with targeted syntax "
+    "inspection for Python imports and security-test assertions; there is no control-flow graph.",
+    "Relationship observations use bounded same-file and import-resolution heuristics; they "
+    "do not establish runtime data flow.",
     "No runtime verification of any kind — nothing in this pipeline executes the "
     "target application or confirms a path is actually reachable.",
-    "Control and readiness evidence is keyword/path/header-based; a differently "
-    "named function performing an identical check is invisible to this scanner.",
+    "Control evidence remains primarily keyword/path/proximity-based; a differently named "
+    "function performing an identical check may be invisible to this scanner.",
     "This report reflects repository evidence only — practices, controls, or "
     "processes that live outside the scanned repository are not visible here.",
 ]
@@ -106,6 +106,8 @@ def build_report(
     controls: ControlAssessment,
     risks: RiskAssessment,
     readiness: ReadinessAssessment,
+    *,
+    include_experimental_scoring: bool = False,
 ) -> VibeExplainerReport:
     """Assemble the full report from already-computed Phase 1-6 results. No new
     scanning, scoring, or classification happens here."""
@@ -119,17 +121,14 @@ def build_report(
     metadata = {
         "tool": "vibe-explainer",
         "version": __version__,
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "repository": repo_name,
         "repository_path": discovery.root,
         "assessment_completeness": readiness.assessment_completeness,
+        "experimental_scoring_enabled": include_experimental_scoring,
     }
 
     ai_surface_detected = discovery.has_ai_signal()
-    highest_severity = None
-    if risks.scenarios:
-        highest_severity = min(risks.scenarios, key=lambda s: _SEVERITY_ORDER.get(s.severity, 99)).severity
-
     # Context breakdown: how much of the discovered surface is production code vs
     # test/example/doc/generated content. This is the key signal the first
     # real-world run (aletheia-core) showed was missing — a production webhook and
@@ -148,17 +147,20 @@ def build_report(
     if not ai_surface_detected:
         statement = "No AI evidence review sections were generated because no supported AI-related signal was detected."
     else:
-        statement = (
-            f"{len(risks.scenarios)} static concern scenario(s) generated from repository evidence. "
-            f"Experimental process-evidence policy output: {readiness.readiness_name}."
-        )
+        if include_experimental_scoring:
+            statement = (
+                f"{len(risks.scenarios)} static concern scenario(s) generated from repository evidence. "
+                "Uncalibrated experimental scoring and process classification were explicitly enabled."
+            )
+        else:
+            statement = (
+                f"{len(risks.scenarios)} static concern scenario(s) generated from repository evidence. "
+                "Concern scenarios are unscored and process evidence is reported as a checklist."
+            )
 
     executive_summary = {
         "ai_surface": "DETECTED" if ai_surface_detected else "NOT_DETECTED",
         "risk_scenario_count": len(risks.scenarios),
-        "highest_risk_severity": highest_severity,
-        "readiness_level": readiness.readiness_level,
-        "readiness_name": readiness.readiness_name,
         "assessment_completeness": readiness.assessment_completeness,
         "total_findings": len(discovery.findings),
         "production_findings": production_findings,
@@ -166,6 +168,19 @@ def build_report(
         "findings_by_context": dict(sorted(context_counts.items())),
         "statement": statement,
     }
+    if include_experimental_scoring:
+        highest_severity = None
+        if risks.scenarios:
+            highest_severity = min(
+                risks.scenarios, key=lambda s: _SEVERITY_ORDER.get(s.severity, 99)
+            ).severity
+        executive_summary.update(
+            {
+                "highest_risk_severity": highest_severity,
+                "readiness_level": readiness.readiness_level,
+                "readiness_name": readiness.readiness_name,
+            }
+        )
 
     # ---- AI inventory: grouped by discovery category -----------------------
     by_category: dict[str, list[dict[str, Any]]] = {}
@@ -251,59 +266,130 @@ def build_report(
         )
     controls_out = {"by_status": controls_by_status, "note": "NOT_DETECTED means no supporting evidence was found in this repository — not that the control definitely does not exist."}
 
-    # ---- Risks: severity distribution + deterministically sorted list -------
+    # ---- Concerns: unscored by default; legacy formula is explicit opt-in ----
     severity_counts = {"CRITICAL": 0, "HIGH": 0, "MODERATE": 0, "LOW": 0}
     for s in risks.scenarios:
         severity_counts[s.severity] = severity_counts.get(s.severity, 0) + 1
-    sorted_scenarios = sorted(
-        risks.scenarios,
-        key=lambda s: (_SEVERITY_ORDER.get(s.severity, 99), -s.score, s.category, s.risk_id),
-    )
+    sorted_scenarios = sorted(risks.scenarios, key=lambda s: (s.category, s.risk_id))
+    if include_experimental_scoring:
+        sorted_scenarios = sorted(
+            risks.scenarios,
+            key=lambda s: (_SEVERITY_ORDER.get(s.severity, 99), -s.score, s.category, s.risk_id),
+        )
+    scenario_rows = []
+    for s in sorted_scenarios:
+        evidence_classes = sorted({e.type.upper() for e in s.evidence})
+        reachability = "STATICALLY_INFERRED" if s.related_dataflow_ids else "NOT_ESTABLISHED"
+        assumptions = ["Runtime reachability and exploitability were not tested."]
+        if not s.related_dataflow_ids:
+            assumptions.append("No supported structural relationship establishes a path to this concern.")
+        assumptions.append("Repository control evidence does not establish runtime enforcement or effectiveness.")
+        row = {
+            "risk_id": s.risk_id,
+            "title": s.title,
+            "category": s.category,
+            "evidence_strength": s.confidence.upper(),
+            "evidence_class": evidence_classes,
+            "reachability_status": reachability,
+            "unresolved_assumptions": assumptions,
+            "rationale": _redact_check(s.rationale),
+            "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in s.evidence],
+            "related_finding_ids": s.related_finding_ids,
+            "related_dataflow_ids": s.related_dataflow_ids,
+            "related_control_ids": s.related_control_ids,
+            "primary_context": s.primary_context,
+        }
+        if include_experimental_scoring:
+            row.update(
+                {
+                    "score": s.score,
+                    "severity": s.severity,
+                    "exposure": s.exposure,
+                    "safety_impact": s.safety_impact,
+                    "security_exposure": s.security_exposure,
+                    "likelihood": s.likelihood,
+                    "confidence": s.confidence,
+                    "context_adjusted": s.context_adjusted,
+                }
+            )
+        scenario_rows.append(row)
+
+    by_category: dict[str, int] = {}
+    for scenario in scenario_rows:
+        category = scenario["category"]
+        by_category[category] = by_category.get(category, 0) + 1
     risks_out = {
         "total": len(risks.scenarios),
-        "by_severity": severity_counts,
+        "methodology": "EXPERIMENTAL_SCORED" if include_experimental_scoring else "UNSCORED_EVIDENCE_REVIEW",
+        "by_category": dict(sorted(by_category.items())),
         "ai_surface_detected": risks.ai_surface_detected,
         "summary_note": risks.summary_note,
-        "scenarios": [
-            {
-                "risk_id": s.risk_id,
-                "title": s.title,
-                "category": s.category,
-                "score": s.score,
-                "severity": s.severity,
-                "exposure": s.exposure,
-                "safety_impact": s.safety_impact,
-                "security_exposure": s.security_exposure,
-                "likelihood": s.likelihood,
-                "confidence": s.confidence,
-                "rationale": _redact_check(s.rationale),
-                "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in s.evidence],
-                "related_finding_ids": s.related_finding_ids,
-                "related_dataflow_ids": s.related_dataflow_ids,
-                "related_control_ids": s.related_control_ids,
-                "primary_context": s.primary_context,
-                "context_adjusted": s.context_adjusted,
-            }
-            for s in sorted_scenarios
-        ],
+        "scenarios": scenario_rows,
     }
+    if include_experimental_scoring:
+        risks_out["by_severity"] = severity_counts
 
-    # ---- Readiness: pass through with blocker text --------------------------
+    # ---- Process evidence: unscored checklist by default --------------------
     next_level_blocked_reason = None
     if readiness.readiness_level is not None and readiness.readiness_level < 4:
         next_la = next((la for la in readiness.level_assessments if la.level == readiness.readiness_level + 1), None)
         if next_la and next_la.missing_requirements:
             next_level_blocked_reason = next_la.missing_requirements[0]
-    readiness_out = readiness.to_dict()
-    readiness_out["blocked_from_next_level"] = next_level_blocked_reason
+    if include_experimental_scoring:
+        readiness_out = readiness.to_dict()
+        readiness_out["blocked_from_next_level"] = next_level_blocked_reason
+    else:
+        check_names = {
+            1: "AI inventory and threat-model scope",
+            2: "Repeatable AI security testing",
+            3: "CI-integrated security evaluation",
+            4: "Scheduled evaluation and retained evidence",
+        }
+        checks = []
+        prerequisite_labels = {
+            "Level 2 not sufficiently achieved": (
+                "repeatable AI security testing evidence prerequisite not established"
+            ),
+            "Level 3 not sufficiently achieved": (
+                "CI-integrated security evaluation evidence prerequisite not established"
+            ),
+        }
+        for assessment in readiness.level_assessments:
+            if readiness.assessment_completeness == "PARTIAL":
+                artifact_status = "UNKNOWN"
+            elif assessment.evidence:
+                artifact_status = "EVIDENCE_OBSERVED"
+            else:
+                artifact_status = "NOT_OBSERVED"
+            checks.append(
+                {
+                    "check_id": f"PROCESS-{assessment.level}",
+                    "name": check_names[assessment.level],
+                    "artifact_status": artifact_status,
+                    "enforcement_status": "UNKNOWN",
+                    "evidence": [e.to_dict() for e in assessment.evidence],
+                    "missing_evidence": [
+                        prerequisite_labels.get(item, item)
+                        for item in assessment.missing_requirements
+                    ],
+                    "unresolved_assumptions": [
+                        "Offline repository inspection cannot verify execution, enforcement, or effectiveness."
+                    ],
+                }
+            )
+        readiness_out = {
+            "assessment_status": "UNSCORED",
+            "assessment_completeness": readiness.assessment_completeness,
+            "checks": checks,
+            "limitations": list(readiness.limitations),
+            "self_scan": readiness.self_scan,
+        }
 
     # ---- Recommendations: derived from existing evidence, deduplicated ------
     recommendations: list[dict[str, Any]] = []
     covered_control_ids: set[str] = set()
 
     for s in sorted_scenarios:
-        if s.severity not in ("CRITICAL", "HIGH", "MODERATE"):
-            continue
         covered_control_ids.update(s.related_control_ids)
         recommendations.append(
             {
@@ -313,17 +399,31 @@ def build_report(
                 "suggested_action": _suggested_action_for(s.category),
                 "related_risk_ids": [s.risk_id],
                 "related_control_ids": s.related_control_ids,
-                "_sort_key": (0, _SEVERITY_ORDER.get(s.severity, 99), -s.score),
+                "_sort_key": (
+                    0,
+                    _SEVERITY_ORDER.get(s.severity, 99) if include_experimental_scoring else 0,
+                    -s.score if include_experimental_scoring else s.risk_id,
+                ),
             }
         )
 
     if next_level_blocked_reason:
+        public_blocked_reason = next_level_blocked_reason
+        if not include_experimental_scoring:
+            public_blocked_reason = {
+                "Level 2 not sufficiently achieved": (
+                    "repeatable AI security testing evidence prerequisite not established"
+                ),
+                "Level 3 not sufficiently achieved": (
+                    "CI-integrated security evaluation evidence prerequisite not established"
+                ),
+            }.get(next_level_blocked_reason, next_level_blocked_reason)
         recommendations.append(
             {
-                "title": f"Reach AI security readiness Level {min((readiness.readiness_level or 0) + 1, 4)}",
-                "why_it_matters": next_level_blocked_reason,
-                "evidence_summary": "See readiness level assessments for detail.",
-                "suggested_action": "Address the listed missing requirement to progress readiness.",
+                "title": "Address the next process-evidence gap",
+                "why_it_matters": public_blocked_reason,
+                "evidence_summary": "See the unscored process-evidence checklist for detail.",
+                "suggested_action": "Add reviewable evidence for the listed process check.",
                 "related_risk_ids": [],
                 "related_control_ids": [],
                 "_sort_key": (1, 0, 0),
@@ -420,6 +520,7 @@ def render_text(report: VibeExplainerReport) -> str:
     add("")
 
     es = report.executive_summary
+    experimental = bool(report.metadata.get("experimental_scoring_enabled"))
     add(f"SUPPORTED AI-RELATED EVIDENCE\n{es['ai_surface']}")
     add("")
     if es["ai_surface"] == "NOT_DETECTED":
@@ -436,12 +537,17 @@ def render_text(report: VibeExplainerReport) -> str:
         add(f"{es['defaulted_production_findings']} production finding(s) were classified by "
             "conservative default; confirm during analyst review.")
     add("")
-    add(f"RISKS\n{es['risk_scenario_count']} scenario(s)")
-    add(f"Highest: {es['highest_risk_severity'] or 'none'}")
+    mode = "experimental scored" if experimental else "unscored"
+    add(f"CONCERNS\n{es['risk_scenario_count']} {mode} scenario(s)")
+    if experimental:
+        add(f"Experimental highest: {es.get('highest_risk_severity') or 'none'}")
     add("")
-    level = es["readiness_level"]
-    level_display = f"Level {level} — {_LEVEL_DISPLAY.get(level, es['readiness_name'])}" if level else es["readiness_name"]
-    add(f"READINESS\n{level_display}")
+    if experimental:
+        level = es["readiness_level"]
+        level_display = f"Level {level} — {_LEVEL_DISPLAY.get(level, es['readiness_name'])}" if level else es["readiness_name"]
+        add(f"EXPERIMENTAL PROCESS CLASSIFICATION\n{level_display}")
+    else:
+        add("PROCESS EVIDENCE\nUNSCORED CHECKLIST — enforcement UNKNOWN")
     if es["assessment_completeness"] == "PARTIAL":
         add("!! ASSESSMENT INCOMPLETE — some files could not be assessed. Findings/risks")
         add("   below are a lower bound. Do not read as \"only N risks\".")
@@ -452,21 +558,30 @@ def render_text(report: VibeExplainerReport) -> str:
     add(sep)
 
     if report.risks["scenarios"]:
-        add("TOP RISKS")
+        add("CONCERN SCENARIOS")
         add("")
         for s in report.risks["scenarios"][:5]:
-            add(f"{s['severity']:<9} {s['title']}")
-            add(f"{'':<9} {s['rationale'][:100]}{'...' if len(s['rationale']) > 100 else ''}")
+            label = f"{s['severity']:<9} " if experimental else ""
+            add(f"{label}{s['title']}")
+            add(f"  Evidence: {s['evidence_strength']} | Reachability: {s['reachability_status']}")
+            add(f"  {s['rationale'][:100]}{'...' if len(s['rationale']) > 100 else ''}")
             add("")
         add(sep)
 
-    add("READINESS")
+    add("PROCESS-EVIDENCE CHECKLIST")
     add("")
-    for la in report.readiness["level_assessments"]:
-        status_display = "ACHIEVED" if la["status"] == "ACHIEVED" else ("BLOCKED" if la["status"] == "NOT_ACHIEVED" else la["status"])
-        add(f"Level {la['level']}  {_LEVEL_DISPLAY[la['level']]:<12} {status_display}")
-        if la["status"] != "ACHIEVED" and la["missing_requirements"]:
-            add(f"         └─ {la['missing_requirements'][0]}")
+    if experimental:
+        for la in report.readiness["level_assessments"]:
+            status_display = "ACHIEVED" if la["status"] == "ACHIEVED" else ("BLOCKED" if la["status"] == "NOT_ACHIEVED" else la["status"])
+            add(f"Level {la['level']}  {_LEVEL_DISPLAY[la['level']]:<12} {status_display}")
+            if la["status"] != "ACHIEVED" and la["missing_requirements"]:
+                add(f"         └─ {la['missing_requirements'][0]}")
+    else:
+        for check in report.readiness["checks"]:
+            add(f"{check['artifact_status']:<17} {check['name']}")
+            add(f"  Enforcement: {check['enforcement_status']}")
+            if check["missing_evidence"]:
+                add(f"  Missing: {check['missing_evidence'][0]}")
     add("")
     add(sep)
 

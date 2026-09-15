@@ -237,17 +237,23 @@ def _risk_rows_for_class(report: Any, class_id: str, relevant: bool) -> list[dic
         # AAC-16 specifically concerns MCP STDIO; a generic shell path is not enough.
         if class_id == "AAC-16" and not relevant:
             continue
-        mapped.append(
-            {
-                "risk_id": scenario.get("risk_id"),
-                "category": category,
-                "severity": scenario.get("severity"),
-                "score": scenario.get("score"),
-                "confidence": scenario.get("confidence"),
-                "related_finding_ids": list(scenario.get("related_finding_ids", [])),
-                "related_dataflow_ids": list(scenario.get("related_dataflow_ids", [])),
-            }
-        )
+        row = {
+            "risk_id": scenario.get("risk_id"),
+            "category": category,
+            "evidence_strength": scenario.get("evidence_strength", scenario.get("confidence")),
+            "evidence_class": list(scenario.get("evidence_class", [])),
+            "reachability_status": scenario.get("reachability_status", "NOT_ESTABLISHED"),
+            "unresolved_assumptions": list(scenario.get("unresolved_assumptions", [])),
+            "related_finding_ids": list(scenario.get("related_finding_ids", [])),
+            "related_dataflow_ids": list(scenario.get("related_dataflow_ids", [])),
+        }
+        # Legacy numeric policy outputs are propagated only when the caller
+        # explicitly built an experimental-scoring report.
+        if "score" in scenario:
+            row["score"] = scenario["score"]
+        if "severity" in scenario:
+            row["severity"] = scenario["severity"]
+        mapped.append(row)
     return mapped
 
 

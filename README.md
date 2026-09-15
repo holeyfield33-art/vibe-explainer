@@ -7,9 +7,9 @@ output for analyst validation.
 
 It is a pre-release evidence tool. It is not a vulnerability scanner, penetration test,
 compliance assessment, certification, or proof that a control is effective. Current
-discovery is primarily regex-based, relationships include proximity/import heuristics,
-and numeric concern scores and process-evidence levels are uncalibrated experimental
-policy outputs.
+discovery is primarily regex-based, and relationships include proximity/import heuristics.
+Default reports intentionally contain no numeric concern severity or awarded maturity
+level.
 
 ## Quick start
 
@@ -24,6 +24,9 @@ python -m vibe_explainer /path/to/repo --json
 
 # Detailed Markdown for analyst review
 python -m vibe_explainer /path/to/repo --report -o review.md
+
+# Research compatibility only: include uncalibrated legacy scoring
+python -m vibe_explainer /path/to/repo --json --experimental-scoring
 
 # Optional mapping to a local Agent Security Index export
 python -m vibe_explainer /path/to/repo --json \
@@ -41,8 +44,10 @@ The original repository-orientation report is available only through
 - Static relationship observations with their resolution method and limitations.
 - Evidence for twelve security-control categories. `DETECTED` means evidence was found,
   not that enforcement or effectiveness was verified.
-- Deterministic concern scenarios and process signals. Their current scores, severities,
-  and levels are experimental and not empirically calibrated.
+- Unscored concern scenarios with evidence class, evidence strength, static reachability,
+  and unresolved assumptions.
+- An unscored process-evidence checklist. Offline-unverifiable execution, enforcement,
+  and effectiveness remain `UNKNOWN` even when an artifact is observed.
 - Assessment completeness, truncation, excluded/unreadable-file accounting, and explicit
   lower-bound language when coverage is partial.
 - Optional ASI taxonomy mapping from a pinned local catalog. The mapping does not detect
@@ -77,6 +82,10 @@ Current limitations:
 - Runtime reachability, exploitability, control enforcement, external security processes,
   and deployed configuration are not verified.
 - Precision and recall have not yet been established on an independently labelled corpus.
+
+The legacy formula and four-level policy are available only with
+`--experimental-scoring`. They are uncalibrated research outputs and must not be used as
+vulnerability severity, maturity, certification, or assurance.
 
 The complete release gate and implementation order are in
 [docs/LAUNCH-READINESS-PLAN.md](docs/LAUNCH-READINESS-PLAN.md).

@@ -2,6 +2,7 @@ import json
 import io
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -34,14 +35,17 @@ class TestPortableOutput(unittest.TestCase):
         self.assertEqual(raw.getvalue().decode("cp1252").strip(), "PASS ? safe")
 
 
-def _report(fixture_name: str):
+def _report(fixture_name: str, *, experimental: bool = False):
     discovery = discover_ai(FIXTURES / fixture_name)
     surface = build_attack_surface(discovery)
     graph = build_dataflow(discovery)
     controls = assess_controls(discovery, surface, graph)
     risks = assess_risks(discovery, surface, graph, controls)
     readiness = assess_readiness(discovery, surface, graph, controls, risks)
-    return build_report(discovery, surface, graph, controls, risks, readiness)
+    return build_report(
+        discovery, surface, graph, controls, risks, readiness,
+        include_experimental_scoring=experimental,
+    )
 
 
 class TestExecutiveSummary(unittest.TestCase):
@@ -50,16 +54,16 @@ class TestExecutiveSummary(unittest.TestCase):
         es = report.executive_summary
         self.assertEqual(es["ai_surface"], "DETECTED")
         self.assertEqual(es["risk_scenario_count"], len(report.risks["scenarios"]))
-        self.assertEqual(es["highest_risk_severity"], "HIGH")
-        self.assertEqual(es["readiness_level"], 1)
+        self.assertNotIn("highest_risk_severity", es)
+        self.assertNotIn("readiness_level", es)
 
     def test_no_ai_case(self):
         report = _report("../../examples/sample-vibe-project")
         es = report.executive_summary
         self.assertEqual(es["ai_surface"], "NOT_DETECTED")
         self.assertEqual(es["risk_scenario_count"], 0)
-        self.assertIsNone(es["highest_risk_severity"])
-        self.assertIsNone(es["readiness_level"])
+        self.assertNotIn("highest_risk_severity", es)
+        self.assertNotIn("readiness_level", es)
         self.assertIn("no supported AI-related signal was detected", es["statement"])
 
     def test_forbidden_language_never_appears(self):
@@ -122,41 +126,51 @@ class TestControls(unittest.TestCase):
 
 
 class TestRiskSummary(unittest.TestCase):
-    def test_severity_distribution_present(self):
+    def test_default_summary_is_by_category_not_severity(self):
         report = _report("agent-with-tools")
-        self.assertEqual(sum(report.risks["by_severity"].values()), report.risks["total"])
+        self.assertEqual(sum(report.risks["by_category"].values()), report.risks["total"])
+        self.assertNotIn("by_severity", report.risks)
 
-    def test_risks_sorted_by_severity_then_score(self):
+    def test_every_default_concern_has_evidence_and_reachability(self):
         report = _report("agent-with-tools")
-        severities = [s["severity"] for s in report.risks["scenarios"]]
-        order = {"CRITICAL": 0, "HIGH": 1, "MODERATE": 2, "LOW": 3}
-        ranks = [order[sev] for sev in severities]
-        self.assertEqual(ranks, sorted(ranks))
+        for scenario in report.risks["scenarios"]:
+            self.assertIn("evidence_strength", scenario)
+            self.assertTrue(scenario["evidence_class"])
+            self.assertIn(scenario["reachability_status"], {"STATICALLY_INFERRED", "NOT_ESTABLISHED"})
+            self.assertTrue(scenario["unresolved_assumptions"])
+            self.assertNotIn("score", scenario)
+            self.assertNotIn("severity", scenario)
+
+    def test_experimental_option_restores_legacy_fields(self):
+        report = _report("agent-with-tools", experimental=True)
+        self.assertIn("by_severity", report.risks)
+        self.assertTrue(all("score" in s and "severity" in s for s in report.risks["scenarios"]))
 
 
 class TestReadiness(unittest.TestCase):
-    def test_all_four_levels_shown(self):
+    def test_default_is_unscored_checklist(self):
         report = _report("basic-chatbot")
-        levels = [la["level"] for la in report.readiness["level_assessments"]]
-        self.assertEqual(levels, [1, 2, 3, 4])
+        self.assertEqual(report.readiness["assessment_status"], "UNSCORED")
+        self.assertEqual(len(report.readiness["checks"]), 4)
+        self.assertNotIn("readiness_level", report.readiness)
 
-    def test_blocked_reason_present_when_not_at_top(self):
+    def test_offline_enforcement_is_always_unknown(self):
         report = _report("basic-chatbot")
-        self.assertIsNotNone(report.readiness["blocked_from_next_level"])
+        self.assertTrue(all(c["enforcement_status"] == "UNKNOWN" for c in report.readiness["checks"]))
 
-    def test_no_blocked_reason_at_level_four(self):
+    def test_experimental_option_restores_level_model(self):
         report = _report("readiness-continuous")
-        self.assertIsNone(report.readiness["blocked_from_next_level"])
+        experimental = _report("readiness-continuous", experimental=True)
+        self.assertNotIn("level_assessments", report.readiness)
+        self.assertEqual(experimental.readiness["readiness_level"], 4)
 
 
 class TestRiskReadinessDistinctionPreserved(unittest.TestCase):
-    def test_both_present_and_independent_in_report(self):
+    def test_unscored_concerns_and_process_checks_are_independent(self):
         report = _report("agent-with-tools")
         self.assertIn("risk_scenario_count", report.executive_summary)
-        self.assertIn("readiness_level", report.executive_summary)
-        # sanity: same fixture as readiness Phase 6 test -- HIGH risk, Level 1
-        self.assertEqual(report.executive_summary["highest_risk_severity"], "HIGH")
-        self.assertEqual(report.executive_summary["readiness_level"], 1)
+        self.assertEqual(report.readiness["assessment_status"], "UNSCORED")
+        self.assertNotIn("highest_risk_severity", report.executive_summary)
 
 
 class TestRecommendations(unittest.TestCase):
@@ -337,8 +351,8 @@ class TestCLI(unittest.TestCase):
         result = self._run(str(FIXTURES / "agent-with-tools"), "--security")
         self.assertEqual(result.returncode, 0)
         self.assertIn("AI REPOSITORY EVIDENCE REVIEW", result.stdout)
-        self.assertIn("RISKS", result.stdout)
-        self.assertIn("READINESS", result.stdout)
+        self.assertIn("CONCERNS", result.stdout)
+        self.assertIn("PROCESS-EVIDENCE CHECKLIST", result.stdout)
         self.assertNotIn("Traceback", result.stderr)
 
     def test_security_mode_json(self):
@@ -346,6 +360,41 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         parsed = json.loads(result.stdout)
         self.assertIn("executive_summary", parsed)
+        self.assertNotIn("highest_risk_severity", parsed["executive_summary"])
+        self.assertTrue(all("score" not in s for s in parsed["risks"]["scenarios"]))
+
+    def test_experimental_scoring_requires_explicit_flag(self):
+        result = self._run(
+            str(FIXTURES / "agent-with-tools"), "--json", "--experimental-scoring"
+        )
+        self.assertEqual(result.returncode, 0)
+        parsed = json.loads(result.stdout)
+        self.assertTrue(parsed["metadata"]["experimental_scoring_enabled"])
+        self.assertTrue(all("score" in s for s in parsed["risks"]["scenarios"]))
+
+    def test_active_output_file_is_excluded_from_discovery(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            (root / "app.py").write_text(
+                "from openai import OpenAI\nclient = OpenAI()\n",
+                encoding="utf-8",
+            )
+            output = root / "review.json"
+            output.write_text(
+                '{"stale": "client.chat.completions.create shell=True"}',
+                encoding="utf-8",
+            )
+
+            result = self._run(str(root), "--json", "--out", str(output))
+
+            self.assertEqual(result.returncode, 0)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            files = {
+                finding["file"]
+                for rows in payload["ai_inventory"]["categories"].values()
+                for finding in rows
+            }
+            self.assertNotIn("review.json", files)
 
     def test_high_risk_repo_still_exits_zero(self):
         result = self._run(str(FIXTURES / "agent-with-tools"), "--security", "--json")
