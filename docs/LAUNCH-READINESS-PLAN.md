@@ -93,7 +93,7 @@ the launch gates at the end of this document pass.
   Verify: package smoke workflow across every documented Python version.
 
 - [ ] **10. Run the release qualification gate**
-  Issue refs: all remaining launch-blocking issues
+  Issue refs: `#33` and all remaining launch-blocking issues
   What to build: Generate reviewed golden JSON and Markdown reports for no-AI, chatbot,
   RAG, tool-agent, MCP, mixed-context monorepo, incomplete scan, and hostile filesystem
   cases. Remove synthetic client-looking artifacts from release inputs.
