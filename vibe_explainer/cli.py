@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -75,6 +76,14 @@ def build_parser() -> argparse.ArgumentParser:
         "(suitable as a client deliverable) instead of the terminal summary.",
     )
     p.add_argument(
+        "--asi-catalog",
+        metavar="PATH",
+        help=(
+            "With --security, map the assessment onto a local Agent Security Index "
+            "export directory or attack-class JSON. No network fetch is performed."
+        ),
+    )
+    p.add_argument(
         "--version",
         action="version",
         version=f"vibe-explainer {__version__}",
@@ -82,7 +91,33 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _run_security_mode(repo: Path, as_json: bool, as_consultant: bool, out: str | None) -> int:
+def _asi_text_summary(matrix: dict) -> str:
+    summary = matrix["summary"]
+    protocols = ", ".join(matrix.get("detected_protocols", [])) or "none detected"
+    return "\n".join(
+        [
+            "",
+            "AGENT SECURITY INDEX MATRIX",
+            "---------------------------",
+            f"Catalog: {matrix.get('catalog_version') or 'version not provided'}",
+            f"Detected protocols: {protocols}",
+            f"Evidence-linked classes: {summary['EVIDENCE_CHAIN']}",
+            f"Control-gap classes: {summary['CONTROL_GAP']}",
+            f"Control-evidence classes: {summary['CONTROL_EVIDENCE']}",
+            f"Relevant but unassessed: {summary['RELEVANT_UNASSESSED']}",
+            f"Not observed by this static mapping: {summary['NOT_OBSERVED']}",
+            "Full row-level mapping is included when --json is used.",
+        ]
+    )
+
+
+def _run_security_mode(
+    repo: Path,
+    as_json: bool,
+    as_consultant: bool,
+    out: str | None,
+    asi_catalog: str | None = None,
+) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
     from .consultant_report import render_consultant_markdown
@@ -100,16 +135,30 @@ def _run_security_mode(repo: Path, as_json: bool, as_consultant: bool, out: str 
         risks = assess_risks(discovery, surface, dataflow, controls)
         readiness = assess_readiness(discovery, surface, dataflow, controls, risks)
         report = build_report(discovery, surface, dataflow, controls, risks, readiness)
+
+        asi_matrix = None
+        if asi_catalog:
+            from .asi_matrix import load_asi_catalog, map_report_to_asi
+
+            catalog = load_asi_catalog(asi_catalog)
+            asi_matrix = map_report_to_asi(report, catalog)
     except Exception as exc:  # noqa: BLE001 — surface cleanly, never a raw traceback
         print(f"Unable to analyze repository:\n{exc}", file=sys.stderr)
         return 1
 
     if as_json:
-        output = report.to_json()
+        payload = report.to_dict()
+        if asi_matrix is not None:
+            payload["asi_matrix"] = asi_matrix
+        output = json.dumps(payload, indent=2, sort_keys=False, ensure_ascii=False)
     elif as_consultant:
         output = render_consultant_markdown(report)
+        if asi_matrix is not None:
+            output += _asi_text_summary(asi_matrix)
     else:
         output = render_text(report)
+        if asi_matrix is not None:
+            output += _asi_text_summary(asi_matrix)
 
     if out:
         out_path = Path(out)
@@ -130,8 +179,12 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: not a directory: {repo}", file=sys.stderr)
         return 2
 
+    if args.asi_catalog and not args.security:
+        print("error: --asi-catalog requires --security", file=sys.stderr)
+        return 2
+
     if args.security:
-        return _run_security_mode(repo, args.json, args.consultant, args.out)
+        return _run_security_mode(repo, args.json, args.consultant, args.out, args.asi_catalog)
 
     # Offline is currently the only implemented path; keep the flag for future LLM mode.
     offline = True if args.offline or True else True
