@@ -60,7 +60,7 @@ class TestExecutiveSummary(unittest.TestCase):
         self.assertEqual(es["risk_scenario_count"], 0)
         self.assertIsNone(es["highest_risk_severity"])
         self.assertIsNone(es["readiness_level"])
-        self.assertIn("no AI surface was detected", es["statement"])
+        self.assertIn("no supported AI-related signal was detected", es["statement"])
 
     def test_forbidden_language_never_appears(self):
         for fixture in ("agent-with-tools", "controls-well-controlled", "../../examples/sample-vibe-project"):
@@ -314,15 +314,29 @@ class TestCLI(unittest.TestCase):
             cwd=REPO_ROOT, capture_output=True, text=True,
         )
 
-    def test_default_mode_unchanged(self):
+    def test_default_mode_is_ai_evidence_review(self):
         result = self._run(str(FIXTURES / "basic-chatbot"))
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("AI REPOSITORY EVIDENCE REVIEW", result.stdout)
+
+    def test_help_has_single_product_boundary(self):
+        result = self._run("--help")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("static AI repository evidence review", result.stdout)
+        self.assertIn("--legacy-mental-model", result.stdout)
+        self.assertIn("--report", result.stdout)
+        self.assertNotIn("--offline", result.stdout)
+        self.assertNotIn("--security", result.stdout)
+
+    def test_legacy_mental_model_requires_explicit_flag(self):
+        result = self._run(str(FIXTURES / "basic-chatbot"), "--legacy-mental-model")
         self.assertEqual(result.returncode, 0)
         self.assertIn("Mental model", result.stdout)
 
     def test_security_mode_human_readable(self):
         result = self._run(str(FIXTURES / "agent-with-tools"), "--security")
         self.assertEqual(result.returncode, 0)
-        self.assertIn("AI SECURITY ASSESSMENT", result.stdout)
+        self.assertIn("AI REPOSITORY EVIDENCE REVIEW", result.stdout)
         self.assertIn("RISKS", result.stdout)
         self.assertIn("READINESS", result.stdout)
         self.assertNotIn("Traceback", result.stderr)

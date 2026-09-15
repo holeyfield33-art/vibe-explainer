@@ -7,6 +7,13 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Consolidate the product identity on **Vibe Explainer**, make the static AI repository
+  evidence review the default CLI behavior, move the deprecated orientation report behind
+  `--legacy-mental-model`, and remove the dead `--offline` flag.
+- Replace client-ready/assurance language in README, SPEC, CLI help, and detailed Markdown
+  with explicit analyst-validation, heuristic-evidence, and non-certification boundaries.
+- Add `--report` as the primary detailed Markdown flag; retain `--security` and
+  `--consultant` only as deprecated compatibility aliases during the pre-release line.
 - Exclude planted `tests/` and `examples/` evidence during self-scan readiness
   evaluation, label self-scans explicitly, and prevent self-assessment from being
   cited as meaningful readiness evidence.

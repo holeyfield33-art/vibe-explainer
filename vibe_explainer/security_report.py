@@ -146,11 +146,11 @@ def build_report(
             defaulted_production_findings += 1
 
     if not ai_surface_detected:
-        statement = "No AI security assessment was generated because no AI surface was detected."
+        statement = "No AI evidence review sections were generated because no supported AI-related signal was detected."
     else:
         statement = (
-            f"{len(risks.scenarios)} AI security risk scenario(s) identified. "
-            f"AI security readiness assessed as {readiness.readiness_name}."
+            f"{len(risks.scenarios)} static concern scenario(s) generated from repository evidence. "
+            f"Experimental process-evidence policy output: {readiness.readiness_name}."
         )
 
     executive_summary = {
@@ -415,12 +415,12 @@ def render_text(report: VibeExplainerReport) -> str:
     sep = "─" * 40
 
     add("VIBE EXPLAINER")
-    add("AI SECURITY ASSESSMENT")
+    add("AI REPOSITORY EVIDENCE REVIEW")
     add(sep)
     add("")
 
     es = report.executive_summary
-    add(f"AI SURFACE\n{es['ai_surface']}")
+    add(f"SUPPORTED AI-RELATED EVIDENCE\n{es['ai_surface']}")
     add("")
     if es["ai_surface"] == "NOT_DETECTED":
         add(es["statement"])

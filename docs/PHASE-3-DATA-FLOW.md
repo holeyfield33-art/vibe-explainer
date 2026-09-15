@@ -118,7 +118,7 @@ both findings are correctly discovered, and correctly produce **zero** edges bet
 An edge here means "two pieces of static evidence are plausibly related by position."
 It says nothing about whether the relationship is reachable at runtime, whether input
 is actually attacker-controlled, or whether any control mitigates it. That's the job of
-later phases (Controls, Risk) and, beyond static analysis entirely, the future Aletheia
+later phases (Controls, Risk) and, beyond static analysis entirely, any future runtime
 AI Red Team. Confusing "I found a plausible same-file relationship" with "this is
 exploitable" is precisely the overclaiming this module's design (INFERRED-only status,
 two-tier confidence, no-edge-on-insufficient-evidence) is built to prevent.

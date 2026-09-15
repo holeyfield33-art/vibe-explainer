@@ -1,5 +1,8 @@
 # Phase 8 — Context Coverage & Bounded Cross-File Resolution
 
+> **Historical implementation record:** References to the former default CLI are
+> superseded by `README.md` and `SPEC.md`.
+
 Phase 8 makes the assessment *context-aware* and adds *bounded* AST-based structure
 resolution. It was driven by three real-repository validation runs (see
 `PHASE-8-VALIDATION.md`), each of which surfaced a distinct bug/gap class that

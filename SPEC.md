@@ -1,111 +1,94 @@
-# Vibe Explainer — Product Spec (v0.1, legacy mental-model scope)
+# Vibe Explainer Product Specification
 
-> **Current scope note:** This document describes the original mental-model product.
-> The repository now also contains an experimental static AI security evidence
-> pipeline. That pipeline is not a vulnerability scanner, compliance assessment, or
-> maturity certification. Product consolidation remains unfinished.
+## Product boundary
 
-## Problem
+Vibe Explainer is an offline static AI repository evidence reviewer. Its product output
+is a traceable set of evidence leads and explicit limitations for a human analyst. The
+legacy repository-orientation report is deprecated and available only through
+`--legacy-mental-model`.
 
-People act like they cannot adopt vibe-coded projects. Often the original developer cannot explain the code either. The cost of understanding feels higher than the value of the project.
+Vibe Explainer does not claim vulnerability discovery, exploitability, runtime
+reachability, control effectiveness, compliance, certification, or organizational
+security maturity.
 
-## Solution
+## Users and jobs
 
-A tool that produces a short, honest **mental-model report** so a new person (or future self) can orient quickly and start changing the code with confidence.
-
-## Goals
-
-- Orientation in < 5 minutes for a typical small/medium vibe-coded repo
-- Useful even when no human can explain the original intent
-- Complementary to deterministic scanners (especially vibe-check)
-- Local-first options; honest about what is LLM vs deterministic
-- Report length stays human-scale (target: readable in one sitting)
-
-## Non-goals (v1)
-
-- Full automated refactoring or “clean up my entire codebase”
-- Behavioral proof / execution of claims (see Lie Detector)
-- Perfect multi-language parity on day one
-- Replacing human judgment or code review
-
-## Primary user stories
-
-1. **Adopter**: “I found this repo / was handed this project. I need to know where to start reading and what the main pieces are.”
-2. **Original author**: “I vibe-coded this three weeks ago and no longer remember how it works. Help me regain a map.”
-3. **Reviewer / auditor**: “I need a fast high-level picture plus the places most likely to be opaque or risky before I dive in.”
+- A security analyst needs a bounded first pass over an AI-integrated repository.
+- An engineering team needs an inventory of AI-related code and unresolved review areas.
+- A governance team needs machine-readable evidence references without treating absence
+  of repository evidence as proof that a control does not exist.
 
 ## Inputs
 
-- Path to a local repository (required)
-- Optional: path to a vibe-check JSON report
-- Optional (future): agent session logs / chat history
-- CLI flags: `--offline`, `--format`, `--out`, depth / language hints
+- A local repository path.
+- Optional local Agent Security Index catalog export.
+- Output selection: terminal summary, JSON, or detailed Markdown.
+
+The reviewer does not fetch catalogs, call an LLM, or execute target code.
 
 ## Outputs
 
-Markdown report (primary) containing:
+Every output exposes the applicable subset of:
 
-1. Overview (1 short paragraph)
-2. Architecture sketch (Mermaid preferred, ASCII fallback)
-3. Start-here reading order (5–8 items with reasons)
-4. Key-file / module summaries (highest-value only)
-5. Risk & opacity notes (optionally grounded in vibe-check findings)
-6. Suggested first questions a newcomer might ask
+1. Engine and schema identity.
+2. Repository identity and assessment completeness.
+3. AI evidence inventory with file, line, category, confidence, context, and stable ID.
+4. Attack-surface leads derived from inventory evidence.
+5. Static relationship observations with resolution method.
+6. Security-control artifact evidence and explicit status semantics.
+7. Concern scenarios and their underlying assumptions.
+8. Experimental process-evidence classification and its inputs.
+9. Recommendations linked to evidence IDs.
+10. Limitations, coverage gaps, aggregation counts, and unsupported analysis.
+11. Optional ASI mapping with catalog provenance and mapping limitations.
 
-Future: self-contained HTML interactive tour, JSON machine-readable export.
+All advertised JSON fields must be serialized. Human-readable output may summarize but
+must preserve references to the complete machine-readable evidence.
 
-## Architecture (tool itself)
+## Required honesty semantics
 
+- `DETECTED` or `EVIDENCE_FOUND` means repository evidence was observed; it never means a
+  control was proven effective.
+- `NOT_DETECTED` means no supporting evidence was found within assessed coverage; it never
+  means a control does not exist.
+- `NOT_APPLICABLE` requires absence of the relevant supported surface, not merely weak
+  confidence.
+- `UNKNOWN` is used when coverage or offline verification cannot support a conclusion.
+- `PARTIAL` completeness makes every count a lower bound.
+- `AGGREGATED` means all matches were counted but repetitive evidence was summarized.
+- Production context reached through fallback must be distinguished from positively
+  classified context.
+- Unsupported-language lexical leads cannot drive authoritative conclusions.
+
+Numeric scores, severity bands, and four-level process classifications remain experimental
+until independently labelled calibration exists. They must be disclosed as deterministic
+policy outputs wherever displayed and are scheduled for removal from default output.
+
+## Untrusted-repository boundary
+
+- One shared walker owns directory exclusions, symlink refusal, and deterministic order.
+- Final-component reads refuse symlinks and non-regular files.
+- Per-file, file-count, total-byte, and elapsed-time budgets are enforced.
+- Skips, unreadable files, and budget exhaustion affect completeness explicitly.
+- Target code is never imported or executed.
+- Evidence is minimized and redacted at construction and serialization boundaries.
+- Reports remain potentially sensitive even after redaction.
+
+## CLI contract
+
+```text
+vibe-explainer REPO                         terminal evidence review
+vibe-explainer REPO --json                  complete machine-readable review
+vibe-explainer REPO --report -o FILE        detailed analyst-review Markdown
+vibe-explainer REPO --asi-catalog PATH      add local ASI mapping
+vibe-explainer REPO --legacy-mental-model   deprecated orientation report
 ```
-CLI
- ├── scanner        # file tree, entry points, language detection, basic structure
- ├── integrate      # optional vibe-check report loader
- ├── synthesizer    # offline heuristics + optional LLM layer
- └── report         # markdown / mermaid / (future HTML) renderer
-```
 
-### Offline / deterministic layer
+`--security` and `--consultant` are deprecated compatibility aliases during the
+pre-release line. `--offline` is removed because all supported review behavior is offline.
 
-- Walk the tree (respecting common ignore patterns)
-- Detect likely entry points (main, app, index, server, cli, routes, etc.)
-- Detect package manifests and high-level stack signals
-- Rank files by size, centrality heuristics, and name signals
-- Surface directory shape and obvious layers (frontend/backend, routes/services/models, etc.)
+## Release criteria
 
-### LLM layer (optional)
-
-- Turn structural facts into a coherent narrative overview
-- Propose a sensible architecture diagram
-- Write the “why this file first” reasons and key-file summaries
-- Generate natural first questions
-- Stay constrained: short, concrete, grounded in the files that were actually seen
-
-## Success metrics (qualitative for v1)
-
-- A stranger can open the report and know the first three files to read within two minutes
-- Original author reaction: “yes, that matches what I was trying to build”
-- Report does not balloon into an unreadable generated wiki
-- Offline mode still produces something useful when no API key is present
-
-## Relationship to the Aletheia / vibe toolchain
-
-```
-Aletheia portfolio auditor  → which repos need attention
-vibe-check                 → what’s wrong / triage disposition
-vibe-explainer             → here’s the map so a human can look productively
-Lie Detector               → does the repo do what it claims
-```
-
-## Open questions / later
-
-- How aggressively to support session-log / prompt archaeology
-- Whether to emit characterization-test stubs
-- Interactive HTML vs pure markdown first
-- Local model support (Ollama etc.) as first-class offline+LLM path
-
-## Untrusted-repository handling
-
-All modes must treat repository trees as hostile input. File symlinks and non-regular
-files are skipped, content reads are bounded, and evidence is redacted before
-serialization. Scan-wide resource budgets and a unified coverage ledger remain
-required before a production-ready milestone.
+The authoritative implementation sequence and GO/NO-GO gates are maintained in
+`docs/LAUNCH-READINESS-PLAN.md`. Until those gates pass, detailed reports require analyst
+validation and the product must not be sold as an automated audit or certification.

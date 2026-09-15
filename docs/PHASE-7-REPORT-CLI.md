@@ -1,5 +1,8 @@
 # Phase 7 — Report + CLI Product Integration
 
+> **Historical implementation record:** The evidence review is now the default product
+> mode. See `README.md` and `SPEC.md` for the current CLI contract.
+
 > **Handling warning:** Reports are manually reviewable evidence artifacts, not
 > vulnerability findings or certifications. Secret redaction is defense-in-depth;
 > generated output should still be handled as potentially sensitive.
@@ -135,7 +138,7 @@ applicable, plus Phase 6's own limitations merged in (deduplicated).
 
 ```
 VIBE EXPLAINER
-AI SECURITY ASSESSMENT
+AI REPOSITORY EVIDENCE REVIEW
 ────────────────────────────────────────
 
 AI SURFACE

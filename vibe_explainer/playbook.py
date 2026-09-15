@@ -1,9 +1,7 @@
-"""Mapping to the HackerOne 'Security for AI: Readiness and Risk Playbook'.
+"""Internal mapping adapted from HackerOne playbook vocabulary.
 
-Vibe Explainer's risk formula and readiness ladder already implement this framework;
-this module supplies the framework's exact published vocabulary so the consultant
-deliverable cites recognizable playbook language (level names + goals, the risk-band
-table, the [P]/[V]/[G] control taxonomy, platform archetypes) rather than a paraphrase.
+This reference data supports deterministic report labels. It is not a validated
+implementation, conformance mapping, HackerOne assessment, or endorsement.
 
 Pure reference data + pure functions over already-computed report values. No analysis,
 no engine coupling.

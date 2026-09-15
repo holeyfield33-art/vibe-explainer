@@ -6,7 +6,7 @@ the launch gates at the end of this document pass.
 
 ## Execution checklist
 
-- [ ] **1. Establish one honest product boundary**
+- [x] **1. Establish one honest product boundary**
   Issue refs: `#12`
   What to build: Choose one product name, separate or remove legacy mental-model mode,
   and replace certification-like, consultant-grade, standards-aligned, and maturity

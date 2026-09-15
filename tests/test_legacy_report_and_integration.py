@@ -118,7 +118,7 @@ class TestCLIInProcess(unittest.TestCase):
         self.assertEqual(build_parser().prog, "vibe-explainer")
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            code = main([str(SAMPLE), "--offline"])
+            code = main([str(SAMPLE), "--legacy-mental-model"])
         self.assertEqual(code, 0)
         self.assertIn("Mental model", stdout.getvalue())
 
@@ -129,14 +129,14 @@ class TestCLIInProcess(unittest.TestCase):
             vibe.write_text(json.dumps({"disposition": {"disposition": "REVIEW"}}))
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
-                code = main([str(SAMPLE), "--vibe-check-report", str(vibe), "--out", str(out)])
+                code = main([str(SAMPLE), "--legacy-mental-model", "--vibe-check-report", str(vibe), "--out", str(out)])
             self.assertEqual(code, 0)
             self.assertIn("REVIEW", out.read_text())
             self.assertIn("Wrote", stderr.getvalue())
 
             warning = io.StringIO()
             with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(warning):
-                self.assertEqual(main([str(SAMPLE), "--vibe-check-report", str(Path(temp_dir) / "missing")]), 0)
+                self.assertEqual(main([str(SAMPLE), "--legacy-mental-model", "--vibe-check-report", str(Path(temp_dir) / "missing")]), 0)
             self.assertIn("warning", warning.getvalue())
 
     def test_bad_path_and_default_scan_error(self):
@@ -148,7 +148,7 @@ class TestCLIInProcess(unittest.TestCase):
         with patch("vibe_explainer.cli.scan_repo", side_effect=RuntimeError("boom")):
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
-                self.assertEqual(main([str(SAMPLE)]), 1)
+                self.assertEqual(main([str(SAMPLE), "--legacy-mental-model"]), 1)
         self.assertIn("scan failed", stderr.getvalue())
 
     def test_security_modes_and_error_boundary_in_process(self):
@@ -160,14 +160,14 @@ class TestCLIInProcess(unittest.TestCase):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
             self.assertEqual(_run_security_mode(FIXTURES / "agent-with-tools", False, True, None), 0)
-        self.assertIn("# AI Security Readiness Assessment", stdout.getvalue())
+        self.assertIn("# AI Repository Evidence Review", stdout.getvalue())
 
         with tempfile.TemporaryDirectory() as temp_dir:
             out = Path(temp_dir) / "security.txt"
             stderr = io.StringIO()
             with contextlib.redirect_stderr(stderr):
                 self.assertEqual(_run_security_mode(FIXTURES / "agent-with-tools", False, False, str(out)), 0)
-            self.assertIn("AI SECURITY ASSESSMENT", out.read_text())
+            self.assertIn("AI REPOSITORY EVIDENCE REVIEW", out.read_text())
 
         with patch("vibe_explainer.ai_discovery.discover_ai", side_effect=RuntimeError("boom")):
             stderr = io.StringIO()

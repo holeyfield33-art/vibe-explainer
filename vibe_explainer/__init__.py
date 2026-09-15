@@ -1,3 +1,3 @@
-"""vibe-explainer: mental-model reports for vibe-coded projects."""
+"""Vibe Explainer: offline static AI repository evidence review."""
 
 __version__ = "0.1.0"

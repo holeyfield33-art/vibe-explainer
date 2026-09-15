@@ -24,10 +24,9 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="vibe-explainer",
         description=(
-            "Generate a short mental-model report for a (vibe-coded) repository "
-            "so humans can orient and adopt it. Use --security for an AI security "
-            "assessment (inventory, attack surface, data flow, controls, risk, "
-            "readiness) instead."
+            "Generate an offline static AI repository evidence review. Results are "
+            "heuristic leads for analyst validation, not vulnerability findings, "
+            "control-effectiveness proof, compliance, or certification."
         ),
     )
     p.add_argument(
@@ -37,14 +36,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to the repository root (default: current directory)",
     )
     p.add_argument(
-        "--offline",
+        "--legacy-mental-model",
         action="store_true",
-        help="Deterministic structural pass only (no LLM). Currently the only implemented mode.",
+        help="Run the deprecated repository-orientation report instead of the AI evidence review.",
     )
     p.add_argument(
         "--vibe-check-report",
         metavar="PATH",
-        help="Optional path to a vibe-check JSON report for grounded risk notes",
+        help="With --legacy-mental-model, add grounded notes from a vibe-check JSON report.",
     )
     p.add_argument(
         "--out",
@@ -56,30 +55,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--format",
         choices=("markdown",),
         default="markdown",
-        help="Output format for the default mental-model report (only markdown is implemented in v0.1)",
+        help="With --legacy-mental-model, select its output format.",
     )
     p.add_argument(
         "--security",
         action="store_true",
-        help="Run the AI security assessment (discovery, attack surface, data flow, "
-        "controls, risk, readiness) instead of the default mental-model report.",
+        help=argparse.SUPPRESS,
     )
     p.add_argument(
         "--json",
         action="store_true",
-        help="With --security, emit the full assessment as JSON instead of human-readable text.",
+        help="Emit the complete evidence review as JSON.",
     )
     p.add_argument(
+        "--report",
         "--consultant",
+        dest="detailed_report",
         action="store_true",
-        help="With --security, emit a consultant-grade Markdown assessment report "
-        "(suitable as a client deliverable) instead of the terminal summary.",
+        help="Emit detailed Markdown for analyst review. --consultant is a deprecated alias.",
     )
     p.add_argument(
         "--asi-catalog",
         metavar="PATH",
         help=(
-            "With --security, map the assessment onto a local Agent Security Index "
+            "Map the evidence review onto a local Agent Security Index "
             "export directory or attack-class JSON. No network fetch is performed."
         ),
     )
@@ -179,15 +178,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: not a directory: {repo}", file=sys.stderr)
         return 2
 
-    if args.asi_catalog and not args.security:
-        print("error: --asi-catalog requires --security", file=sys.stderr)
+    if args.vibe_check_report and not args.legacy_mental_model:
+        print("error: --vibe-check-report requires --legacy-mental-model", file=sys.stderr)
         return 2
 
-    if args.security:
-        return _run_security_mode(repo, args.json, args.consultant, args.out, args.asi_catalog)
+    if not args.legacy_mental_model:
+        return _run_security_mode(repo, args.json, args.detailed_report, args.out, args.asi_catalog)
 
-    # Offline is currently the only implemented path; keep the flag for future LLM mode.
-    offline = True if args.offline or True else True
+    if args.json or args.detailed_report or args.asi_catalog:
+        print(
+            "error: --json, --report/--consultant, and --asi-catalog cannot be used "
+            "with --legacy-mental-model",
+            file=sys.stderr,
+        )
+        return 2
 
     try:
         scan = scan_repo(repo)
@@ -206,7 +210,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             vibe_notes = summarize_vibe_findings(report)
 
-    md = render_markdown(scan, vibe_notes=vibe_notes, offline=offline)
+    md = render_markdown(scan, vibe_notes=vibe_notes, offline=True)
 
     if args.out:
         out_path = Path(args.out)

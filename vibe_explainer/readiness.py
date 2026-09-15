@@ -1,7 +1,7 @@
-"""AI security readiness assessment — demonstrated process maturity, not risk severity.
+"""Experimental process-evidence classification, independent of concern severity.
 
-"Readiness measures demonstrated AI security maturity and repeatability. It is
-independent of the severity of individual risk scenarios."
+The policy uses repository artifacts as heuristic signals of repeatable security work.
+It does not verify execution, enforcement, effectiveness, or organizational maturity.
 
 "Running Vibe Explainer does not itself increase the assessed readiness of the target
 repository." Every process-evidence check in this module looks at the TARGET
@@ -547,7 +547,7 @@ def assess_readiness(
         f"Highest current risk severity from Phase 5: "
         f"{max((s.severity for s in risks.scenarios), default='none (no scenarios generated)', key=lambda sev: {'LOW': 0, 'MODERATE': 1, 'HIGH': 2, 'CRITICAL': 3}.get(sev, -1))}. "
         "This is provided as context only and did not influence the readiness level above — "
-        "risk severity and readiness maturity are assessed independently."
+        "concern severity and process-evidence classification are computed independently."
     )
 
     return ReadinessAssessment(

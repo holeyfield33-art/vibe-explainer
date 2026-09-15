@@ -4,9 +4,8 @@ Groups AIFinding objects from ai_discovery.py into the six standard buckets
 (Inputs / Model / Retrieval / Tools / Outputs / Storage) and attaches a short,
 static security-relevance note to each item.
 
-This is attack-surface *discovery*, not penetration testing: it says what's
-there and why it matters, never whether it's exploitable. Exploitability is
-explicitly out of scope here — that's the future Aletheia AI Red Team's job.
+This is attack-surface *discovery*, not penetration testing: it says what static
+evidence was observed and why it may matter, never whether it is exploitable.
 """
 
 from __future__ import annotations

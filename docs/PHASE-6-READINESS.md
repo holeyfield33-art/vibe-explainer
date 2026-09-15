@@ -1,19 +1,22 @@
 # Phase 6 — AI Security Readiness Assessment
 
+> **Historical policy record:** Levels are uncalibrated experimental process-evidence
+> outputs, not measurements or certifications of security maturity.
+
 > **Gameability warning:** Levels are inferred from repository paths, headers, code
 > keywords, and CI text. The scanner does not prove that tests are substantive, CI is
 > enforced, or documented processes operate in practice.
 
-**Readiness measures demonstrated AI security maturity and repeatability. It is
-independent of the severity of individual risk scenarios.**
+**This experimental policy classifies repository process signals independently of
+individual concern scenarios; it does not measure actual maturity or repeatability.**
 
 **Running Vibe Explainer does not itself increase the assessed readiness of the target
 repository.**
 
 ## 1. Purpose
 
-Answer: *"How mature and repeatable is the repository's demonstrated AI security
-practice?"* — never *"what is the highest current security risk?"*
+Answer: *"Which supported process signals are visible in this repository?"* — never
+*"how mature is this organization?"* or *"what is the highest current security risk?"*
 `assess_readiness(discovery, attack_surface, dataflow, controls, risks) -> ReadinessAssessment`
 consumes all five prior phases and performs exactly one new thing: a small, isolated
 scan for repository **process** evidence (test directories, CI config, documentation) —
@@ -22,7 +25,7 @@ never a second AI-component scan.
 ## 2. Risk vs readiness
 
 A risk score (Phase 5) answers "how concerning is this identified evidence scenario."
-Readiness answers "how mature and repeatable is the security testing program." These
+The process policy summarizes which repository signals were found. These
 are independent axes, verified directly: `agent-with-tools` (one HIGH-severity risk
 scenario, zero process evidence) and `basic-chatbot` (only LOW-severity risk, zero
 process evidence) land at the **same** readiness level — Level 1 — because neither has

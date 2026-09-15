@@ -1,78 +1,47 @@
-# Consultant Assessment Report (packaging layer)
+# Detailed Evidence Review Report
 
-This is a **packaging** layer, not an engineering expansion. It renders the existing
-Phase 0–7 assessment as a consultant-grade Markdown deliverable a security
-professional can hand to a client. It makes **no changes to the analysis engine** —
-`consultant_report.py` is a pure function over an already-built `VibeExplainerReport`.
+`consultant_report.py` is the historical module name for the detailed Markdown renderer.
+The renderer is a packaging layer over `VibeExplainerReport`; it performs no scanning,
+classification, scoring, or validation of its own.
 
-> **Pre-release warning:** “Consultant-grade” describes formatting, not analytical
-> assurance. The engine remains an experimental regex/proximity evidence reporter.
-> Severities and readiness levels are not empirically calibrated, and reports require
-> manual validation before client use.
+Use the report as an analyst work product:
 
-## Why it exists
-
-The valuable asset isn't the regex engine — it's the traceable assessment chain:
-
-```
-Repository → AI surface → attack surface → data flow → controls → risk →
-readiness → recommendations → evidence-backed report
+```bash
+vibe-explainer REPO --report
+vibe-explainer REPO --report -o review.md
 ```
 
-The customer (initially: a security consultant) is buying the professional deliverable,
-not the scanner. This layer produces that deliverable.
+`--consultant` remains a deprecated compatibility alias. The report is not automatically
+suitable for delivery: an analyst must verify scope, evidence, context, inferred
+relationships, secrets, conclusions, and limitations before sharing it.
 
-## Usage
+## Structure
 
-```
-vibe-explainer <repo> --security --consultant            # Markdown to stdout
-vibe-explainer <repo> --security --consultant -o report.md
-```
+The report contains scope and engine metadata, executive evidence summary, AI inventory,
+attack-surface leads, inferred relationships, concern scenarios, control artifacts,
+experimental process-evidence classification, recommendations, evidence appendix, and
+limitations.
 
-`--consultant` requires `--security`. It is mutually informative with `--json`
-(if both are given, `--json` wins, since JSON is the machine format). The default
-mode and plain `--security` terminal output are unchanged.
+Every important row carries a finding, relationship, control, or concern ID that can be
+traced to repository evidence. Traceability supports review; it does not convert heuristic
+evidence into proof of exploitability or control effectiveness.
 
-## Report structure
+## Framework vocabulary
 
-Repository / date / commit-scope header, then: Executive Summary, AI Attack Surface,
-AI Data Flows, Key Risks (with per-scenario factor breakdown and severity), Security
-Controls (grouped by status), AI Security Readiness (current level + all four level
-assessments + blocker), Top Remediations (prioritized, each traced to its risk/control
-IDs), Evidence Appendix (complete finding inventory), and Limitations.
+Some categories and four-level labels use vocabulary adapted from HackerOne's
+"Security for AI: Readiness and Risk Playbook." Vibe Explainer is not a HackerOne
+assessment, endorsed implementation, certification, or validated conformance tool.
+Current numeric scores, severity bands, and process levels are uncalibrated deterministic
+policy outputs and are scheduled for removal from default reporting.
 
-## The one thing that makes it more than an "LLM security report"
+## Sensitive output
 
-**Every important conclusion traces back to evidence.** Attack-surface rows carry the
-finding ID they came from; risk scenarios carry related finding/control IDs; the
-evidence appendix lists every finding by ID so any claim above can be walked back to
-`file:line:evidence`. That traceability is the moat, not the pattern count.
+Evidence is redacted during construction and again at serialization boundaries. Secret
+recognition is necessarily incomplete. Treat every report as potentially sensitive,
+retain it according to the client's handling policy, and inspect it before distribution.
 
-## Determinism and dates
+## Determinism
 
-The only injected value is `assessment_date` (defaults to today). It is reader-facing
-metadata and never affects any analytical content — deliberately kept out of the
-underlying report object so finding IDs and ordering stay deterministic regardless of
-when the report is rendered.
-
-## Secret redaction
-
-The renderer reads already-redacted fields from `VibeExplainerReport`, and redaction
-is re-applied at the Phase 7 serialization boundary. Covered secret formats are
-verified by `TestConsultantReportRedaction` and CLI-level leak checks.
-
-Redaction is also applied when discovery captures evidence and recognizes sensitive
-assignments, credential-bearing URLs, private keys, JWTs, and common provider token
-formats. This remains defense-in-depth rather than a guarantee that every secret
-format is recognizable; reports must still be treated as sensitive.
-
-## Untrusted tree safety
-
-File symlinks and non-regular entries are excluded from content and process-evidence
-scans. Reads are bounded and use no-follow semantics where supported. Global file,
-byte, depth, and elapsed-time budgets remain future hardening work.
-
-## Explicit non-goals
-
-No SaaS, no dashboard, no GitHub App, no new detection, no engine changes. The next
-step after this is **validation with real security professionals**, not more building.
+The renderer's date is reader-facing metadata and does not alter finding IDs or analytical
+ordering. Full reproducibility also requires source commit, dirty state, scan configuration,
+exclusions, and catalog hash; those provenance additions are tracked in issue #10.
