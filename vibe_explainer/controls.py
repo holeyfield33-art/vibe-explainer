@@ -5,12 +5,12 @@ Never answers: "is this application secure?"
 
 Every status is a claim about EVIDENCE, not about effectiveness:
 
-  DETECTED       - meaningful repository evidence of the control was found.
-                   Does NOT mean the control is correct, complete, or
-                   unbypassable — only that evidence of it exists.
+  EVIDENCE_FOUND - meaningful repository evidence of the control was found.
+                   Structural enforcement and runtime effectiveness are
+                   reported independently.
   PARTIAL        - some evidence exists but coverage is incomplete or the
                    evidence itself is only moderately specific.
-  NOT_DETECTED   - the relevant AI surface is clearly present and could
+  NOT_FOUND      - the relevant AI surface is clearly present and could
                    reasonably be searched, but no supporting evidence was
                    found. This is NOT a claim that the control doesn't
                    exist anywhere (it could live in an external service,
@@ -20,7 +20,7 @@ Every status is a claim about EVIDENCE, not about effectiveness:
                    reasonable judgment either way.
   NOT_APPLICABLE - the attack surface this control protects doesn't exist
                    in this repository at all (e.g. no RAG => no RAG
-                   security control to assess). Preferred over NOT_DETECTED
+                   security control to assess). Preferred over NOT_FOUND
                    or UNKNOWN whenever the surface genuinely isn't present —
                    labeling an absent feature "missing" overclaims.
 
@@ -29,6 +29,7 @@ No risk scoring, no readiness classification here — see docs/PHASE-4-CONTROLS.
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import re
 from dataclasses import dataclass, field
@@ -37,15 +38,26 @@ from typing import Any
 
 from .ai_discovery import AIFinding, DiscoveryResult, MAX_FILE_BYTES, _iter_candidate_files, _read_text
 from .attack_surface import AttackSurfaceResult
-from .dataflow import MAX_DATAFLOW_LINE_DISTANCE, DataFlowGraph, DataFlowObservation
+from .dataflow import DataFlowGraph, DataFlowObservation
 from .exclusion_policy import safe_regular_file_size, walk_pruned
 from .security_utils import redact_secrets
 
-STATUS_DETECTED = "DETECTED"
+STATUS_EVIDENCE_FOUND = "EVIDENCE_FOUND"
 STATUS_PARTIAL = "PARTIAL"
-STATUS_NOT_DETECTED = "NOT_DETECTED"
+STATUS_NOT_FOUND = "NOT_FOUND"
 STATUS_UNKNOWN = "UNKNOWN"
 STATUS_NOT_APPLICABLE = "NOT_APPLICABLE"
+
+# Source compatibility for integrations importing the old constant names.  The
+# serialized values intentionally use the more honest vocabulary above.
+STATUS_DETECTED = STATUS_EVIDENCE_FOUND
+STATUS_NOT_DETECTED = STATUS_NOT_FOUND
+
+ENFORCEMENT_STRUCTURAL = "STRUCTURALLY_CONNECTED"
+ENFORCEMENT_PARTIAL = "PARTIALLY_CONNECTED"
+ENFORCEMENT_NOT_ESTABLISHED = "NOT_ESTABLISHED"
+ENFORCEMENT_NOT_APPLICABLE = "NOT_APPLICABLE"
+EFFECTIVENESS_UNVERIFIED = "UNVERIFIED"
 
 TOOL_LIKE_CATEGORIES = {"tool_agent", "mcp"}
 HIGH_RISK_TOOL_NAMES = {"Shell execution", "Dynamic code execution"}
@@ -77,6 +89,10 @@ class SecurityControl:
     related_finding_ids: list[str]
     related_dataflow_ids: list[str]
     rationale: str
+    artifact_status: str = STATUS_NOT_FOUND
+    enforcement_status: str = ENFORCEMENT_NOT_ESTABLISHED
+    effectiveness_status: str = EFFECTIVENESS_UNVERIFIED
+    uncovered_surfaces: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -89,6 +105,10 @@ class SecurityControl:
             "related_finding_ids": list(self.related_finding_ids),
             "related_dataflow_ids": list(self.related_dataflow_ids),
             "rationale": self.rationale,
+            "artifact_status": self.artifact_status,
+            "enforcement_status": self.enforcement_status,
+            "effectiveness_status": self.effectiveness_status,
+            "uncovered_surfaces": list(self.uncovered_surfaces),
         }
 
 
@@ -242,17 +262,121 @@ def _scan_doc_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
     return by_control
 
 
-def _findings_covered(matches: list[_EvidenceMatch], findings: list[AIFinding]) -> set[str]:
-    """Finding ids that have at least one evidence match in the same file within
-    the shared same-file proximity threshold (reusing dataflow.py's constant so
-    'nearby' means the same thing across the whole assessment chain)."""
+@dataclass
+class _PythonStructure:
+    tree: ast.AST
+    parents: dict[ast.AST, ast.AST]
+    scopes: list[ast.AST]
+
+
+def _python_structures(root_path: Path) -> dict[str, _PythonStructure]:
+    """Parse candidate Python files once for conservative structural checks."""
+    result: dict[str, _PythonStructure] = {}
+    for file_path in _iter_candidate_files(root_path):
+        if file_path.suffix.lower() != ".py":
+            continue
+        text = _read_text(file_path)
+        if text is None:
+            continue
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            continue
+        parents: dict[ast.AST, ast.AST] = {}
+        for parent in ast.walk(tree):
+            for child in ast.iter_child_nodes(parent):
+                parents[child] = parent
+        scopes = [tree] + [
+            node for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))
+        ]
+        rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+        result[rel] = _PythonStructure(tree=tree, parents=parents, scopes=scopes)
+    return result
+
+
+def _span(node: ast.AST) -> tuple[int, int]:
+    if isinstance(node, ast.Module):
+        return (1, max((getattr(n, "end_lineno", getattr(n, "lineno", 1)) for n in ast.walk(node)), default=1))
+    start = min([getattr(node, "lineno", 1)] + [getattr(d, "lineno", 1) for d in getattr(node, "decorator_list", [])])
+    return start, getattr(node, "end_lineno", getattr(node, "lineno", start))
+
+
+def _scope_at(structure: _PythonStructure, line: int) -> ast.AST | None:
+    candidates = [scope for scope in structure.scopes if _span(scope)[0] <= line <= _span(scope)[1]]
+    return min(candidates, key=lambda scope: _span(scope)[1] - _span(scope)[0]) if candidates else None
+
+
+def _nodes_at(structure: _PythonStructure, line: int) -> list[ast.AST]:
+    return [
+        node for node in ast.walk(structure.tree)
+        if getattr(node, "lineno", -1) <= line <= getattr(node, "end_lineno", getattr(node, "lineno", -1))
+    ]
+
+
+def _is_consumed_guard(structure: _PythonStructure, match: _EvidenceMatch, control_id: str) -> bool:
+    """Require evidence to participate in control flow or a consumed transform.
+
+    This deliberately rejects a bare call expression such as
+    ``check_permission(...); dangerous_call()``: invoking a checker without
+    consuming its result is not enforcement.
+    """
+    nodes = _nodes_at(structure, match.line)
+    if not nodes:
+        return False
+
+    if "decorator" in match.tag.lower():
+        return any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.decorator_list for n in nodes)
+    if control_id == "C07":
+        return any(isinstance(n, ast.Call) for n in nodes)  # logging is a side effect
+    if control_id == "C04" and "response format" in match.tag.lower():
+        return any(isinstance(n, ast.keyword) and n.arg == "response_format" for n in nodes)
+
+    calls = [n for n in nodes if isinstance(n, ast.Call)]
+    for call in calls:
+        current: ast.AST = call
+        while current in structure.parents:
+            parent = structure.parents[current]
+            if isinstance(parent, ast.Expr):
+                break
+            if isinstance(parent, (ast.If, ast.While, ast.Assert, ast.IfExp, ast.comprehension)):
+                return True
+            if isinstance(parent, (ast.Assign, ast.AnnAssign, ast.NamedExpr, ast.Return)):
+                return True
+            current = parent
+    return False
+
+
+def _structural_coverage(
+    root_path: Path,
+    structures: dict[str, _PythonStructure],
+    control_id: str,
+    matches: list[_EvidenceMatch],
+    findings: list[AIFinding],
+) -> tuple[set[str], list[str]]:
+    """Return surfaces with a same-function, ordered, consumed relationship."""
     covered: set[str] = set()
+    uncovered: list[str] = []
     for finding in findings:
-        for m in matches:
-            if m.file == finding.file and abs(m.line - finding.line) <= MAX_DATAFLOW_LINE_DISTANCE:
+        structure = structures.get(finding.file)
+        finding_scope = _scope_at(structure, finding.line) if structure else None
+        for match in matches:
+            if not structure or match.file != finding.file:
+                continue
+            if _scope_at(structure, match.line) is not finding_scope:
+                continue
+            if control_id == "C04":
+                ordered = match.line >= finding.line or match.line == finding.line
+            elif control_id == "C07":
+                ordered = True
+            else:
+                ordered = match.line <= finding.line
+            if ordered and _is_consumed_guard(structure, match, control_id):
                 covered.add(finding.id)
                 break
-    return covered
+        if finding.id not in covered:
+            uncovered.append(f"{finding.category}/{finding.name} at {finding.file}:{finding.line} ({finding.id})")
+    return covered, uncovered
 
 
 def _best_confidence(matches: list[_EvidenceMatch]) -> str:
@@ -332,6 +456,7 @@ def assess_controls(
     root_path = Path(discovery.root)
     code_evidence = _scan_code_evidence(root_path)
     doc_evidence = _scan_doc_evidence(root_path)
+    structures = _python_structures(root_path)
 
     findings = discovery.findings
     by_category: dict[str, list[AIFinding]] = {}
@@ -372,6 +497,8 @@ def assess_controls(
             related_finding_ids=[],
             related_dataflow_ids=[],
             rationale=reason,
+            artifact_status=STATUS_NOT_APPLICABLE,
+            enforcement_status=ENFORCEMENT_NOT_APPLICABLE,
         )
 
     def not_detected(
@@ -392,6 +519,11 @@ def assess_controls(
             related_finding_ids=sorted({f.id for f in related}),
             related_dataflow_ids=[],
             rationale=reason,
+            artifact_status=STATUS_NOT_FOUND,
+            enforcement_status=ENFORCEMENT_NOT_ESTABLISHED,
+            uncovered_surfaces=[
+                f"{f.category}/{f.name} at {f.file}:{f.line} ({f.id})" for f in related
+            ],
         )
 
     def detected_or_partial_from_matches(
@@ -401,18 +533,35 @@ def assess_controls(
         matches: list[_EvidenceMatch],
         related_findings: list[AIFinding],
         surface_description: str,
+        require_structural_enforcement: bool = False,
     ) -> SecurityControl:
         confidence = _best_confidence(matches)
-        status = STATUS_DETECTED if confidence == "high" else STATUS_PARTIAL
-        rationale = (
-            f"{surface_description} evidence of the control was found in the repository "
-            f"({len(matches)} matching pattern(s))."
-            if status == STATUS_DETECTED
-            else (
-                f"{surface_description} was found, but only moderate-specificity evidence "
-                f"exists — treated as partial rather than fully detected."
+        covered: set[str] = set()
+        uncovered: list[str] = []
+        enforcement = ENFORCEMENT_NOT_ESTABLISHED
+        if require_structural_enforcement:
+            covered, uncovered = _structural_coverage(
+                root_path, structures, control_id, matches, related_findings
             )
-        )
+            if related_findings and len(covered) == len(related_findings):
+                enforcement = ENFORCEMENT_STRUCTURAL
+                status = STATUS_EVIDENCE_FOUND
+            elif covered:
+                enforcement = ENFORCEMENT_PARTIAL
+                status = STATUS_PARTIAL
+            else:
+                status = STATUS_PARTIAL
+            rationale = (
+                f"{surface_description} artifact evidence exists; structural enforcement was "
+                f"established for {len(covered)} of {len(related_findings)} discovered surfaces. "
+                "Runtime effectiveness remains unverified."
+            )
+        else:
+            status = STATUS_EVIDENCE_FOUND
+            rationale = (
+                f"{surface_description} artifact evidence was found in the repository "
+                f"({len(matches)} matching pattern(s)). Effectiveness remains unverified."
+            )
         return SecurityControl(
             control_id=control_id,
             name=name,
@@ -423,6 +572,9 @@ def assess_controls(
             related_finding_ids=sorted({f.id for f in related_findings}),
             related_dataflow_ids=[],
             rationale=rationale,
+            artifact_status=STATUS_EVIDENCE_FOUND,
+            enforcement_status=enforcement,
+            uncovered_surfaces=uncovered,
         )
 
     # ---- C01 — AI INVENTORY -------------------------------------------
@@ -478,7 +630,7 @@ def assess_controls(
         matches = code_evidence.get("C03", [])
         related = ai_usage + prompt_surface
         if matches:
-            controls.append(detected_or_partial_from_matches("C03", "Input Handling", "INPUT_HANDLING", matches, related, "Input-validation"))
+            controls.append(detected_or_partial_from_matches("C03", "Input Handling", "INPUT_HANDLING", matches, related, "Input-validation", True))
         else:
             controls.append(not_detected("C03", "Input Handling", "INPUT_HANDLING", "AI input surfaces (prompt construction / model invocation) were found, but no schema validation, sanitization, or explicit input-handling evidence was found.", related))
 
@@ -488,7 +640,7 @@ def assess_controls(
     else:
         matches = code_evidence.get("C04", [])
         if matches:
-            controls.append(detected_or_partial_from_matches("C04", "Output Handling", "OUTPUT_HANDLING", matches, ai_usage, "Output-validation"))
+            controls.append(detected_or_partial_from_matches("C04", "Output Handling", "OUTPUT_HANDLING", matches, ai_usage, "Output-validation", True))
         else:
             downstream = [e for e in dataflow.edges if e.relationship in {"invokes_tool", "flows_to_output", "calls_external_service"}]
             extra = ""
@@ -511,7 +663,7 @@ def assess_controls(
         )))
     else:
         matches = code_evidence.get("C05", [])
-        covered = _findings_covered(matches, tool_like)
+        covered, uncovered = _structural_coverage(root_path, structures, "C05", matches, tool_like)
         related_edges = [e for e in dataflow.edges if e.relationship in {"invokes_tool", "flows_to_output"}]
         if not matches:
             control = not_detected("C05", "Tool Authorization", "TOOL_AUTHORIZATION", "Tool execution was detected, but no authorization or permission-check evidence was identified near any of it.", tool_like)
@@ -528,7 +680,9 @@ def assess_controls(
                     evidence=_pattern_evidence_refs(matches),
                     related_finding_ids=sorted({f.id for f in tool_like}),
                     related_dataflow_ids=sorted({f"{e.source_finding_id}->{e.destination_finding_id}:{e.relationship}" for e in related_edges}),
-                    rationale="Authorization evidence was found near every discovered tool-invocation surface.",
+                    rationale="Authorization evidence is structurally connected to every discovered tool-invocation surface; runtime effectiveness remains unverified.",
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_STRUCTURAL,
                 )
             )
         else:
@@ -540,10 +694,12 @@ def assess_controls(
                     related_finding_ids=sorted({f.id for f in tool_like}),
                     related_dataflow_ids=sorted({f"{e.source_finding_id}->{e.destination_finding_id}:{e.relationship}" for e in related_edges}),
                     rationale=(
-                        f"Authorization evidence covers {len(covered)} of {len(tool_like)} discovered "
-                        f"tool-invocation surfaces — at least one tool path has no corresponding "
-                        f"authorization evidence nearby."
+                        f"Authorization evidence is structurally connected to {len(covered)} of {len(tool_like)} discovered "
+                        f"tool-invocation surfaces; uncovered surfaces are listed individually."
                     ),
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_PARTIAL if covered else ENFORCEMENT_NOT_ESTABLISHED,
+                    uncovered_surfaces=uncovered,
                 )
             )
 
@@ -555,7 +711,7 @@ def assess_controls(
     else:
         matches = code_evidence.get("C06", [])
         if matches:
-            controls.append(detected_or_partial_from_matches("C06", "Human Approval", "HUMAN_APPROVAL", matches, tool_like, "Approval/confirmation-gate"))
+            controls.append(detected_or_partial_from_matches("C06", "Human Approval", "HUMAN_APPROVAL", matches, tool_like, "Approval/confirmation-gate", True))
         else:
             controls.append(not_detected("C06", "Human Approval", "HUMAN_APPROVAL", "Tool-invocation surfaces were found, but no approval, confirmation-gate, or human-in-the-loop evidence was found. A UI existing elsewhere in the application is not, by itself, evidence of an approval gate.", tool_like))
 
@@ -568,7 +724,7 @@ def assess_controls(
         matches = code_evidence.get("C07", [])
         related = ai_usage + tool_like
         if matches:
-            controls.append(detected_or_partial_from_matches("C07", "Logging / Auditability", "LOGGING", matches, related, "AI/security-relevant audit logging"))
+            controls.append(detected_or_partial_from_matches("C07", "Logging / Auditability", "LOGGING", matches, related, "AI/security-relevant audit logging", True))
         else:
             controls.append(not_detected("C07", "Logging / Auditability", "LOGGING", "AI usage and/or tool invocation were found, but no AI/security-specific audit-logging evidence was found. Generic application logging elsewhere does not, by itself, count as evidence for this control.", related))
 
@@ -586,6 +742,8 @@ def assess_controls(
                     evidence=_finding_evidence_refs(hardcoded + env_based, "Mixed secret-handling evidence"),
                     related_finding_ids=sorted({f.id for f in hardcoded + env_based}),
                     related_dataflow_ids=[],
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_NOT_ESTABLISHED,
                     rationale="Both environment-variable-based and apparently hardcoded credential evidence were found — mixed practice, not a consistently applied control.",
                 )
             )
@@ -597,6 +755,8 @@ def assess_controls(
                     evidence=_finding_evidence_refs(hardcoded, "Apparent hardcoded credential"),
                     related_finding_ids=sorted({f.id for f in hardcoded}),
                     related_dataflow_ids=[],
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_NOT_ESTABLISHED,
                     rationale="An apparent hardcoded API key was found in source; this contradicts secure secret management regardless of any other evidence.",
                 )
             )
@@ -604,10 +764,12 @@ def assess_controls(
             controls.append(
                 SecurityControl(
                     control_id="C08", name="Secret Management", category="SECRET_MANAGEMENT",
-                    status=STATUS_DETECTED, confidence="moderate",
+                    status=STATUS_PARTIAL, confidence="moderate",
                     evidence=_finding_evidence_refs(env_based, "Environment-variable-based credential reference"),
                     related_finding_ids=sorted({f.id for f in env_based}),
                     related_dataflow_ids=[],
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_NOT_ESTABLISHED,
                     rationale="AI credentials are referenced via environment variables rather than hardcoded — reasonable evidence, though this alone doesn't confirm a dedicated secret manager/vault is in use.",
                 )
             )
@@ -620,7 +782,7 @@ def assess_controls(
     else:
         matches = code_evidence.get("C09", [])
         if matches:
-            controls.append(detected_or_partial_from_matches("C09", "RAG / Retrieval Security", "RAG_SECURITY", matches, rag_retrieval, "Source/content-filtering"))
+            controls.append(detected_or_partial_from_matches("C09", "RAG / Retrieval Security", "RAG_SECURITY", matches, rag_retrieval, "Source/content-filtering", True))
         else:
             controls.append(not_detected("C09", "RAG / Retrieval Security", "RAG_SECURITY", "Retrieval/RAG usage was found, but no source allowlisting, content filtering, or provenance-check evidence was found.", rag_retrieval))
 
@@ -630,7 +792,7 @@ def assess_controls(
     else:
         matches = code_evidence.get("C10", [])
         if matches:
-            controls.append(detected_or_partial_from_matches("C10", "MCP / Tool Governance", "MCP_GOVERNANCE", matches, mcp, "Scoped-permission / default-deny"))
+            controls.append(detected_or_partial_from_matches("C10", "MCP / Tool Governance", "MCP_GOVERNANCE", matches, mcp, "Scoped-permission / default-deny", True))
         else:
             controls.append(not_detected("C10", "MCP / Tool Governance", "MCP_GOVERNANCE", "MCP configuration was found, but no scoped-permission, allowlist, or default-deny evidence was found. MCP configuration existing is not, by itself, evidence of governance.", mcp))
 
@@ -641,7 +803,7 @@ def assess_controls(
         matches = code_evidence.get("C11", [])
         related = ai_usage + db_integrations
         if matches:
-            controls.append(detected_or_partial_from_matches("C11", "AI Data Access", "DATA_ACCESS", matches, related, "Scoped-access"))
+            controls.append(detected_or_partial_from_matches("C11", "AI Data Access", "DATA_ACCESS", matches, related, "Scoped-access", True))
         else:
             controls.append(not_detected("C11", "AI Data Access", "DATA_ACCESS", "AI usage alongside a database/data-store client was found, but no row/tenant-scoping or explicit access-control evidence was found.", related))
 
@@ -652,7 +814,7 @@ def assess_controls(
         )))
     else:
         matches = code_evidence.get("C12", [])
-        covered = _findings_covered(matches, high_risk_tools)
+        covered, uncovered = _structural_coverage(root_path, structures, "C12", matches, high_risk_tools)
         related_edges = [e for e in dataflow.edges if e.relationship == "flows_to_output"]
         if not matches:
             control = not_detected("C12", "High-Risk Action Controls", "HIGH_RISK_ACTIONS", "Shell/dynamic-code-execution was detected, but no sandboxing, allowlist, or confirmation evidence was found nearby.", high_risk_tools)
@@ -668,7 +830,9 @@ def assess_controls(
                     evidence=_pattern_evidence_refs(matches),
                     related_finding_ids=sorted({f.id for f in high_risk_tools}),
                     related_dataflow_ids=sorted({f"{e.source_finding_id}->{e.destination_finding_id}:{e.relationship}" for e in related_edges}),
-                    rationale="Sandboxing/allowlist/confirmation evidence was found near every discovered high-risk action.",
+                    rationale="Control evidence is structurally connected to every discovered high-risk action; runtime effectiveness remains unverified.",
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_STRUCTURAL,
                 )
             )
         else:
@@ -680,6 +844,9 @@ def assess_controls(
                     related_finding_ids=sorted({f.id for f in high_risk_tools}),
                     related_dataflow_ids=sorted({f"{e.source_finding_id}->{e.destination_finding_id}:{e.relationship}" for e in related_edges}),
                     rationale=f"Control evidence covers {len(covered)} of {len(high_risk_tools)} discovered high-risk action surfaces.",
+                    artifact_status=STATUS_EVIDENCE_FOUND,
+                    enforcement_status=ENFORCEMENT_PARTIAL if covered else ENFORCEMENT_NOT_ESTABLISHED,
+                    uncovered_surfaces=uncovered,
                 )
             )
 

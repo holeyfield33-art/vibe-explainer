@@ -217,8 +217,8 @@ class TestRiskReadinessIndependence(unittest.TestCase):
 class TestStrongControlsNoProcess(unittest.TestCase):
     def test_many_detected_controls_do_not_inflate_beyond_level_one(self):
         discovery, surface, graph, controls, risks, readiness = _full_assess("controls-well-controlled")
-        detected_count = len([c for c in controls.controls if c.status == "DETECTED"])
-        self.assertGreaterEqual(detected_count, 4)
+        detected_count = len([c for c in controls.controls if c.status == "EVIDENCE_FOUND"])
+        self.assertGreaterEqual(detected_count, 3)
         self.assertEqual(readiness.readiness_level, 1)
 
 

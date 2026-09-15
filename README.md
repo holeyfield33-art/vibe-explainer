@@ -42,8 +42,9 @@ The original repository-orientation report is available only through
 - AI/provider, prompt, retrieval, tool/agent, MCP, integration, and credential leads.
 - A six-bucket attack-surface inventory with file, line, confidence, and context.
 - Static relationship observations with their resolution method and limitations.
-- Evidence for twelve security-control categories. `DETECTED` means evidence was found,
-  not that enforcement or effectiveness was verified.
+- Evidence for twelve security-control categories, separating artifact presence,
+  same-function structural enforcement, uncovered surfaces, and unverified runtime
+  effectiveness.
 - Unscored concern scenarios with evidence class, evidence strength, static reachability,
   and unresolved assumptions.
 - An unscored process-evidence checklist. Offline-unverifiable execution, enforcement,

@@ -250,7 +250,7 @@ def build_report(
     ]
 
     # ---- Controls: grouped by status -----------------------------------------
-    controls_by_status: dict[str, list[dict[str, Any]]] = {"DETECTED": [], "PARTIAL": [], "NOT_DETECTED": [], "NOT_APPLICABLE": [], "UNKNOWN": []}
+    controls_by_status: dict[str, list[dict[str, Any]]] = {"EVIDENCE_FOUND": [], "PARTIAL": [], "NOT_FOUND": [], "NOT_APPLICABLE": [], "UNKNOWN": []}
     for c in controls.controls:
         controls_by_status.setdefault(c.status, []).append(
             {
@@ -262,9 +262,13 @@ def build_report(
                 "evidence": [{**e.to_dict(), "description": _redact_check(e.description)} for e in c.evidence],
                 "related_finding_ids": c.related_finding_ids,
                 "related_dataflow_ids": c.related_dataflow_ids,
+                "artifact_status": c.artifact_status,
+                "enforcement_status": c.enforcement_status,
+                "effectiveness_status": c.effectiveness_status,
+                "uncovered_surfaces": c.uncovered_surfaces,
             }
         )
-    controls_out = {"by_status": controls_by_status, "note": "NOT_DETECTED means no supporting evidence was found in this repository — not that the control definitely does not exist."}
+    controls_out = {"by_status": controls_by_status, "note": "Artifact presence, structural enforcement, and runtime effectiveness are independent. NOT_FOUND does not prove absence outside this repository."}
 
     # ---- Concerns: unscored by default; legacy formula is explicit opt-in ----
     severity_counts = {"CRITICAL": 0, "HIGH": 0, "MODERATE": 0, "LOW": 0}
@@ -431,7 +435,7 @@ def build_report(
         )
 
     for c in controls.controls:
-        if c.status != "NOT_DETECTED":
+        if c.status != "NOT_FOUND":
             continue
         if c.control_id not in _NOTABLE_CONTROLS:
             continue

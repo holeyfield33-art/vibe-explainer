@@ -19,7 +19,7 @@ from .security_report import VibeExplainerReport
 
 _SEVERITY_LABEL = {"CRITICAL": "Critical", "HIGH": "High", "MODERATE": "Moderate", "LOW": "Low"}
 _LEVEL_NAME = {1: "Baseline", 2: "Managed", 3: "Hardened", 4: "Continuous"}
-_CONTROL_STATUS_ORDER = ["DETECTED", "PARTIAL", "NOT_DETECTED", "UNKNOWN", "NOT_APPLICABLE"]
+_CONTROL_STATUS_ORDER = ["EVIDENCE_FOUND", "PARTIAL", "NOT_FOUND", "UNKNOWN", "NOT_APPLICABLE"]
 
 
 def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: str | None = None) -> str:
@@ -231,12 +231,11 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     # ---- Security controls ------------------------------------------------
     add("## Security Controls")
     add("")
-    add("Evidence of security controls found in the repository, classified by the playbook's "
-        "control taxonomy — **[P] Preventive**, **[V] Validation**, **[G] Governance**. "
-        "**DETECTED** means supporting evidence was found — not that the control is complete, "
-        "effective, or resistant to bypass. **NOT_DETECTED** means no supporting evidence was "
-        "found — not that the control definitely does not exist (it may live outside this "
-        "repository).")
+    add("Repository control evidence classified by the playbook's taxonomy — "
+        "**[P] Preventive**, **[V] Validation**, **[G] Governance**. Artifact presence, "
+        "structural enforcement, and runtime effectiveness are separate axes. "
+        "**EVIDENCE_FOUND** is not an effectiveness claim; **NOT_FOUND** does not prove "
+        "absence outside this repository.")
     add("")
     by_status = report.controls["by_status"]
     for status in _CONTROL_STATUS_ORDER:
@@ -245,11 +244,14 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             continue
         add(f"### {status.replace('_', ' ').title()}")
         add("")
-        add("| Class | Control | Confidence | Rationale |")
-        add("|---|---|---|---|")
+        add("| Class | Control | Artifact | Structural enforcement | Effectiveness | Rationale |")
+        add("|---|---|---|---|---|---|")
         for c in sorted(controls, key=lambda c: c["control_id"]):
             cls = _pb.control_class(c["control_id"])
-            add(f"| [{cls}] | {c['control_id']} {c['name']} | {c['confidence']} | {_cell(c['rationale'])} |")
+            add(f"| [{cls}] | {c['control_id']} {c['name']} | {c['artifact_status']} | "
+                f"{c['enforcement_status']} | {c['effectiveness_status']} | {_cell(c['rationale'])} |")
+            for surface in c.get("uncovered_surfaces", []):
+                add(f"- **Uncovered {c['control_id']} surface:** `{_cell(surface)}`")
         add("")
     add("---")
     add("")

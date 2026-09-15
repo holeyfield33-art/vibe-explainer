@@ -116,13 +116,13 @@ class TestDataFlows(unittest.TestCase):
 
 
 class TestControls(unittest.TestCase):
-    def test_grouped_by_status_includes_not_detected(self):
+    def test_grouped_by_status_includes_not_found(self):
         report = _report("agent-with-tools")
-        self.assertTrue(report.controls["by_status"]["NOT_DETECTED"])
+        self.assertTrue(report.controls["by_status"]["NOT_FOUND"])
 
     def test_not_detected_note_present(self):
         report = _report("agent-with-tools")
-        self.assertIn("not that the control definitely does not exist", report.controls["note"])
+        self.assertIn("does not prove absence", report.controls["note"])
 
 
 class TestRiskSummary(unittest.TestCase):
