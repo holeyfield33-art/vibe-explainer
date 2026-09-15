@@ -250,7 +250,10 @@ class TestUntrustedFilesystemSafety(unittest.TestCase):
             root = Path(root_dir)
             outside = Path(outside_dir) / "secret.py"
             outside.write_text('from openai import OpenAI\nOPENAI_API_KEY = "outside-secret"\n')
-            (root / "linked.py").symlink_to(outside)
+            try:
+                (root / "linked.py").symlink_to(outside)
+            except OSError:
+                self.skipTest("symlink creation requires elevated privilege on this platform")
 
             result = discover_ai(root)
 

@@ -60,7 +60,14 @@ class TestContextTaxonomy(unittest.TestCase):
         self.assertEqual(fc.context, "SECURITY_TEST")
 
     def test_production_default(self):
-        self.assertEqual(classify_file("src/handler.ts").context, "PRODUCTION")
+        fc = classify_file("src/handler.ts")
+        self.assertEqual(fc.context, "PRODUCTION")
+        self.assertTrue(fc.defaulted)
+
+    def test_test_framework_import_prevents_production_default(self):
+        fc = classify_file("checks.py", content="import pytest\n")
+        self.assertEqual(fc.context, "TEST")
+        self.assertFalse(fc.defaulted)
 
     def test_generated_recognized(self):
         self.assertEqual(classify_file("dist/bundle.min.js").context, "GENERATED")
@@ -189,6 +196,13 @@ class TestReportContextIntegration(unittest.TestCase):
             self.assertIn("findings_by_context", es)
             # production-relevant count should exclude the test file's findings
             self.assertLess(es["production_findings"], es["total_findings"])
+            self.assertGreater(es["defaulted_production_findings"], 0)
+            prod = next(
+                finding
+                for finding in report.ai_inventory["categories"]["model_provider"]
+                if finding["file"] == "src/ai.py"
+            )
+            self.assertTrue(prod["context_defaulted"])
 
 
 class TestCrossFileDataFlow(unittest.TestCase):

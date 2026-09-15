@@ -7,6 +7,13 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Exclude planted `tests/` and `examples/` evidence during self-scan readiness
+  evaluation, label self-scans explicitly, and prevent self-assessment from being
+  cited as meaningful readiness evidence.
+- Distinguish production context inferred by conservative default from positively
+  classified context in findings, JSON, the executive summary, and consultant output.
+- Add test-framework import signals for test files whose paths do not identify them
+  as tests.
 - Refuse file symlinks and non-regular filesystem entries during content and
   readiness scans, preventing out-of-repository reads and FIFO/device blocking.
 - Refuse **directory** symlinks too: every walker-touching stage (discovery,
@@ -36,6 +43,8 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Tests
 
+- Make symlink safety tests skip cleanly on Windows hosts that do not grant symlink
+  creation privileges, while retaining the safety assertions on capable hosts.
 - Add adversarial coverage for external file symlinks, FIFOs, readiness-evidence
   manipulation through symlinks, unknown-format secret assignments, URLs, and
   common credential formats.
@@ -48,6 +57,7 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Known limitations
 
-- Static discovery remains regex-based and context-blind.
+- Static discovery remains primarily regex-based; file context is heuristic and
+  conservative-default production classifications require analyst review.
 - Data-flow edges remain same-file proximity inferences.
 - Risk severity and readiness levels have not been empirically calibrated.

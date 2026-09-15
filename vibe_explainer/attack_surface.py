@@ -63,6 +63,7 @@ class AttackSurfaceItem:
     security_relevance: str
     finding_id: str = ""  # traces back to the source AIFinding.id
     context: str = "PRODUCTION"  # Phase 8: file context of the source finding
+    context_defaulted: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -76,6 +77,7 @@ class AttackSurfaceItem:
             "security_relevance": self.security_relevance,
             "finding_id": self.finding_id,
             "context": self.context,
+            "context_defaulted": self.context_defaulted,
         }
 
 
@@ -150,6 +152,7 @@ def build_attack_surface(discovery: DiscoveryResult, *, include_dataflow: bool =
                 security_relevance=_relevance_for(finding),
                 finding_id=finding.id,
                 context=getattr(finding, "context", "PRODUCTION"),
+                context_defaulted=getattr(finding, "context_defaulted", False),
             )
         )
     if include_dataflow:

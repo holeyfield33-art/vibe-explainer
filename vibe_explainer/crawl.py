@@ -13,12 +13,11 @@ discovery consumes, and the coverage summary the report surfaces.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .exclusion_policy import classify_dir_exclusion, safe_regular_file_size
+from .exclusion_policy import safe_regular_file_size, walk_pruned
 from .file_context import classify_file
 
 # Extensions the content scanner can analyze (superset of ai_discovery.SCAN_EXTS,
@@ -105,11 +104,10 @@ class CrawlResult:
 def crawl_repository(root: str | Path, *, read_content_for_context: bool = False) -> CrawlResult:
     """Pass 1: build a complete file inventory with a disposition for every file.
 
-    Directory pruning uses the centralized exclusion policy (exact-name, never
-    prefix), so `.github`, `tests/`, `docs/`, etc. are retained. Excluded
-    directories are still *recorded* (their files get DISP_EXCLUDED with a reason)
-    rather than vanishing — walk pruning is applied but the top of an excluded tree
-    is noted.
+    Directory pruning uses the shared safe walker and centralized exclusion policy
+    (exact-name, never prefix), so `.github`, `tests/`, `docs/`, etc. are retained.
+    Excluded trees are pruned before this coverage view receives candidates; every
+    returned file receives an explicit disposition.
     """
     root_path = Path(root).resolve()
     if not root_path.is_dir():
@@ -117,49 +115,8 @@ def crawl_repository(root: str | Path, *, read_content_for_context: bool = False
 
     result = CrawlResult(root=str(root_path))
 
-    for dirpath, dirnames, filenames in os.walk(root_path):
-        # Record excluded directories (one representative record) then prune them.
-        # A directory symlink is recorded and pruned the same way as an excluded
-        # dir: os.walk's default followlinks=False already refuses to recurse
-        # into it, but leaving it in dirnames invites some later stage to
-        # .resolve()/.stat() through it (out-of-tree read). is_symlink() checks
-        # the link itself, not its target — an lstat-based check.
-        retained = []
-        for d in dirnames:
-            dir_path = Path(dirpath) / d
-            rel = str(dir_path.relative_to(root_path)).replace("\\", "/")
-            excl = classify_dir_exclusion(d)
-            if excl.excluded:
-                result.files.append(
-                    FileRecord(
-                        rel_path=rel + "/",
-                        ext="",
-                        size=0,
-                        disposition=DISP_EXCLUDED,
-                        context="VENDOR" if excl.category == "DEPENDENCY_TREE" else "GENERATED",
-                        context_confidence="high",
-                        reason=excl.reason,
-                        exclusion_category=excl.category,
-                    )
-                )
-            elif dir_path.is_symlink():
-                result.files.append(
-                    FileRecord(
-                        rel_path=rel + "/",
-                        ext="",
-                        size=0,
-                        disposition=DISP_EXCLUDED,
-                        context="GENERATED",
-                        context_confidence="high",
-                        reason="directory symlink — not followed",
-                        exclusion_category="SYMLINK",
-                    )
-                )
-            else:
-                retained.append(d)
-        dirnames[:] = sorted(retained)
-
-        for name in sorted(filenames):
+    for dirpath, _dirnames, filenames in walk_pruned(root_path):
+        for name in filenames:
             full = Path(dirpath) / name
             rel = str(full.relative_to(root_path)).replace("\\", "/")
             ext = full.suffix.lower()

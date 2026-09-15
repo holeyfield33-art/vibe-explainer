@@ -119,10 +119,36 @@ class ProcessSignals:
     risk_register: list[_ProcessEvidence] = field(default_factory=list)
 
 
+def is_self_scan(root_path: Path) -> bool:
+    """True when the scanned root is Vibe Explainer's own repository.
+
+    Detected by two marker modules rather than by directory name, so a copy,
+    rename, or fork is still recognized. This matters because the tool's own
+    test fixtures deliberately contain the exact CI, security-test, and
+    documentation-header patterns the process scan looks for — scanning this
+    repository with itself would otherwise manufacture readiness evidence out
+    of its own test data.
+    """
+    return (root_path / "vibe_explainer" / "readiness.py").is_file() and (
+        root_path / "vibe_explainer" / "exclusion_policy.py"
+    ).is_file()
+
+
+# Paths inside this repository that hold planted patterns (fixtures asserting
+# what the scanner detects, and example projects). Only applied on a self-scan.
+_SELF_SCAN_IGNORED_PREFIXES = ("tests/", "examples/")
+
+
 def _scan_process_signals(root_path: Path) -> ProcessSignals:
     signals = ProcessSignals()
+    self_scan = is_self_scan(root_path)
     for file_path in _iter_all_repo_paths(root_path):
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
+
+        if self_scan and rel.startswith(_SELF_SCAN_IGNORED_PREFIXES):
+            # This tool's own fixtures/examples are planted detector inputs,
+            # not evidence of a security process around this tool.
+            continue
 
         for pattern, confidence in _TEST_ARTIFACT_PATH_HINTS:
             if pattern.search(rel):
@@ -221,6 +247,7 @@ class ReadinessAssessment:
     blockers: list[str]
     limitations: list[str]
     assessment_completeness: str
+    self_scan: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -235,6 +262,7 @@ class ReadinessAssessment:
             "blockers": list(self.blockers),
             "limitations": list(self.limitations),
             "assessment_completeness": self.assessment_completeness,
+            "self_scan": self.self_scan,
         }
 
 
@@ -248,6 +276,13 @@ _STANDARD_LIMITATIONS = [
     "target repository — generated attack-surface/control/risk output is never counted "
     "as process evidence.",
 ]
+
+_SELF_SCAN_LIMITATION = (
+    "SELF-SCAN: the scanned repository is Vibe Explainer itself. Its tests/ and "
+    "examples/ trees are planted detector inputs and have been excluded from process "
+    "evidence, but a tool scanning itself is not a meaningful readiness signal and "
+    "must not be cited as one."
+)
 
 
 def _evidence(type_: str, id_: str, description: str) -> ReadinessEvidenceRef:
@@ -281,6 +316,11 @@ def assess_readiness(
     """
     root = discovery.root
     completeness = COMPLETENESS_AGGREGATED if discovery.truncated else risks.assessment_completeness
+    root_path = Path(root)
+    self_scan = is_self_scan(root_path)
+    limitations = list(_STANDARD_LIMITATIONS)
+    if self_scan:
+        limitations.append(_SELF_SCAN_LIMITATION)
 
     if not discovery.has_ai_signal():
         return ReadinessAssessment(
@@ -293,11 +333,11 @@ def assess_readiness(
             evidence=[],
             level_assessments=[],
             blockers=[],
-            limitations=list(_STANDARD_LIMITATIONS),
+            limitations=limitations,
             assessment_completeness=completeness,
+            self_scan=self_scan,
         )
 
-    root_path = Path(root)
     signals = _scan_process_signals(root_path)
 
     c01 = _control(controls, "C01")
@@ -520,6 +560,7 @@ def assess_readiness(
         evidence=final_assessment.evidence,
         level_assessments=level_assessments,
         blockers=sorted(set(blockers)),
-        limitations=list(_STANDARD_LIMITATIONS),
+        limitations=limitations,
         assessment_completeness=completeness,
+        self_scan=self_scan,
     )

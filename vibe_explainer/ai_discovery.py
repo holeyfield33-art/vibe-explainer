@@ -82,6 +82,7 @@ class AIFinding:
     id: str = ""
     context: str = "PRODUCTION"  # file context (Phase 8D): PRODUCTION/TEST/SECURITY_TEST/...
     context_confidence: str = "moderate"
+    context_defaulted: bool = False
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -98,6 +99,7 @@ class AIFinding:
             "confidence": self.confidence,
             "context": self.context,
             "context_confidence": self.context_confidence,
+            "context_defaulted": self.context_defaulted,
         }
 
 
@@ -448,6 +450,7 @@ def discover_ai(root: str | Path) -> DiscoveryResult:
                         confidence=effective_confidence,
                         context=file_ctx.context,
                         context_confidence=file_ctx.confidence,
+                        context_defaulted=file_ctx.defaulted,
                     )
                 )
 

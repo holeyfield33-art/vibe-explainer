@@ -12,6 +12,7 @@ from vibe_explainer.readiness import (
     STATUS_NOT_ACHIEVED,
     _scan_process_signals,
     assess_readiness,
+    is_self_scan,
 )
 from vibe_explainer.risk import assess_risks
 
@@ -49,7 +50,10 @@ class TestProcessScannerFilesystemSafety(unittest.TestCase):
             outside.write_text("assert True\n")
             link = root / "tests" / "security" / "test_adversarial.py"
             link.parent.mkdir(parents=True)
-            link.symlink_to(outside)
+            try:
+                link.symlink_to(outside)
+            except OSError:
+                self.skipTest("symlink creation requires elevated privilege on this platform")
 
             signals = _scan_process_signals(root)
 
@@ -166,11 +170,24 @@ class TestFalsePositiveProtection(unittest.TestCase):
         *_, readiness = _full_assess("readiness-managed")
         self.assertLess(readiness.readiness_level, 3)
 
-    def test_running_vibe_explainer_on_itself_is_not_special_cased(self):
-        # Sanity: assessing this very repository must go through the same rules,
-        # not a hardcoded "this is Vibe Explainer, mark it Level 4" shortcut.
-        *_, readiness = _full_assess(".")
-        self.assertIn(readiness.readiness_level, (1, 2, 3, 4))
+    def test_running_vibe_explainer_on_itself_is_explicitly_qualified(self):
+        *_, readiness = _full_assess(Path(__file__).resolve().parents[1])
+        self.assertTrue(readiness.self_scan)
+        self.assertTrue(any("SELF-SCAN" in limitation for limitation in readiness.limitations))
+        self.assertEqual(readiness.readiness_level, 1)
+
+    def test_self_scan_fixtures_do_not_manufacture_process_evidence(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            (root / "vibe_explainer").mkdir()
+            (root / "vibe_explainer" / "readiness.py").write_text("")
+            (root / "vibe_explainer" / "exclusion_policy.py").write_text("")
+            planted = root / "tests" / "security" / "test_adversarial.py"
+            planted.parent.mkdir(parents=True)
+            planted.write_text("assert True\n")
+
+            self.assertTrue(is_self_scan(root))
+            self.assertEqual(_scan_process_signals(root).security_test_artifact, [])
 
 
 class TestTruncatedDiscovery(unittest.TestCase):

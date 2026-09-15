@@ -136,11 +136,14 @@ def build_report(
     # a test-fixture string were indistinguishable in the report.
     context_counts: dict[str, int] = {}
     production_findings = 0
+    defaulted_production_findings = 0
     for f in discovery.findings:
         ctx = getattr(f, "context", None) or classify_path(f.file)
         context_counts[ctx] = context_counts.get(ctx, 0) + 1
         if ctx in _PRODUCTION_RELEVANT_REPORT_CONTEXTS:
             production_findings += 1
+        if ctx == CONTEXT_PRODUCTION and getattr(f, "context_defaulted", False):
+            defaulted_production_findings += 1
 
     if not ai_surface_detected:
         statement = "No AI security assessment was generated because no AI surface was detected."
@@ -159,6 +162,7 @@ def build_report(
         "assessment_completeness": readiness.assessment_completeness,
         "total_findings": len(discovery.findings),
         "production_findings": production_findings,
+        "defaulted_production_findings": defaulted_production_findings,
         "findings_by_context": dict(sorted(context_counts.items())),
         "statement": statement,
     }
@@ -175,6 +179,8 @@ def build_report(
                 "evidence": _redact_check(f.evidence),
                 "confidence": f.confidence,
                 "context": getattr(f, "context", None) or classify_path(f.file),
+                "context_confidence": getattr(f, "context_confidence", "moderate"),
+                "context_defaulted": getattr(f, "context_defaulted", False),
             }
         )
     for items in by_category.values():
@@ -202,6 +208,7 @@ def build_report(
                 "finding_id": i.finding_id,
                 "security_relevance": i.security_relevance,
                 "context": getattr(i, "context", None) or classify_path(i.file),
+                "context_defaulted": getattr(i, "context_defaulted", False),
             }
             for i in sorted(by_bucket[b], key=lambda i: (i.file, i.line, i.finding_id))
         ]

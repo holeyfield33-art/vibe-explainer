@@ -75,6 +75,12 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         f"generated content. Findings are labelled by context throughout this report so "
         f"production surface can be distinguished from research and test material.")
     add("")
+    defaulted = es.get("defaulted_production_findings", 0)
+    if defaulted:
+        add(f"> **Context qualification:** **{defaulted}** production finding(s) were classified "
+            "as production by conservative default because no stronger path or content signal "
+            "was available. Confirm these classifications during analyst review.")
+        add("")
     add(f"The repository's demonstrated AI security readiness is assessed as "
         f"**Level {level} — {_LEVEL_NAME.get(level, es['readiness_name'])}**.")
     add("")
