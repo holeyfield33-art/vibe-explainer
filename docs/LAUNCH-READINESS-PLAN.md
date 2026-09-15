@@ -24,7 +24,7 @@ the launch gates at the end of this document pass.
   inert artifacts cannot improve process evidence.
   Verify: adversarial readiness fixtures plus CLI golden-output tests.
 
-- [ ] **3. Redesign the ASI mapping as separate evidence axes**
+- [x] **3. Redesign the ASI mapping as separate evidence axes**
   Issue refs: `#32`; related to `#6`, `#7`, `#8`
   What to build: Report applicability basis, class-specific evidence, mitigation evidence,
   unresolved assumptions, and manual-review status separately. Remove best-control

@@ -7,6 +7,15 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Replace the ASI mapper's single precedence status with independent applicability,
+  class-evidence, per-control mitigation, unresolved-assumption, and manual-review axes.
+  Protocol compatibility can no longer manufacture `CONTROL_GAP`, and conflicting
+  mapped controls remain visible instead of being collapsed to a best status.
+- Add ASI schema 2.0 catalog provenance: version, draft status, independent-review state,
+  and SHA-256 source identity. Detailed Markdown now contains all row mappings, while
+  terminal and JSON output prominently disclose the catalog review state.
+- Pin a reduced 40-class ASI test export and cover positive/negative applicability for
+  Native, MCP, RAG, A2A, ANP, and Skills.
 - Remove numeric scores, severity bands, and awarded readiness levels from default
   terminal, JSON, Markdown, and ASI output. Default concerns now expose evidence class,
   evidence strength, static reachability, and unresolved assumptions; process artifacts

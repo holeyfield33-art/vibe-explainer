@@ -50,8 +50,10 @@ The original repository-orientation report is available only through
   and effectiveness remain `UNKNOWN` even when an artifact is observed.
 - Assessment completeness, truncation, excluded/unreadable-file accounting, and explicit
   lower-bound language when coverage is partial.
-- Optional ASI taxonomy mapping from a pinned local catalog. The mapping does not detect
-  attacks or validate ASI mitigations, and the catalog's draft/review status matters.
+- Optional ASI taxonomy mapping from a pinned local catalog. Applicability, class-specific
+  evidence, individual control-to-mitigation signals, unresolved assumptions, and manual
+  review are separate axes; protocol compatibility alone never becomes a control gap.
+  Catalog version, draft/review status, and source hash appear in every output mode.
 
 ## Evidence boundary
 

@@ -6,7 +6,26 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
+from vibe_explainer.ai_discovery import discover_ai
 from vibe_explainer.asi_matrix import load_asi_catalog, map_report_to_asi
+from vibe_explainer.attack_surface import build_attack_surface
+from vibe_explainer.controls import assess_controls
+from vibe_explainer.dataflow import build_dataflow
+from vibe_explainer.readiness import assess_readiness
+from vibe_explainer.risk import assess_risks
+from vibe_explainer.security_report import build_report
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+def _real_report(fixture: str):
+    discovery = discover_ai(FIXTURES / fixture)
+    surface = build_attack_surface(discovery)
+    dataflow = build_dataflow(discovery)
+    controls = assess_controls(discovery, surface, dataflow)
+    risks = assess_risks(discovery, surface, dataflow, controls)
+    readiness = assess_readiness(discovery, surface, dataflow, controls, risks)
+    return build_report(discovery, surface, dataflow, controls, risks, readiness)
 
 
 class TestCatalogLoading(unittest.TestCase):
@@ -33,6 +52,7 @@ class TestCatalogLoading(unittest.TestCase):
             catalog = load_asi_catalog(root)
             self.assertEqual([row["id"] for row in catalog["classes"]], ["AAC-01", "AAC-09"])
             self.assertEqual(catalog["metadata"]["version"], "0.2.0-draft")
+            self.assertRegex(catalog["source_hash"], r"^sha256:[0-9a-f]{64}$")
 
     def test_loads_generated_combined_catalog_shape(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -104,6 +124,7 @@ class TestMatrixMapping(unittest.TestCase):
                 "by_status": {
                     "DETECTED": [
                         {"control_id": "C03", "name": "Input Handling", "confidence": "high", "evidence": []},
+                        {"control_id": "C05", "name": "Tool Authorization", "confidence": "high", "evidence": []},
                         {"control_id": "C08", "name": "Secret Management", "confidence": "moderate", "evidence": []},
                     ],
                     "NOT_DETECTED": [
@@ -173,16 +194,24 @@ class TestMatrixMapping(unittest.TestCase):
         result = map_report_to_asi(self._report(), catalog)
         rows = {row["id"]: row for row in result["classes"]}
 
-        self.assertEqual(rows["AAC-01"]["assessment_status"], "EVIDENCE_CHAIN")
-        self.assertEqual(rows["AAC-01"]["mapped_risks"][0]["category"], "INPUT_SECURITY")
-        self.assertEqual(rows["AAC-01"]["attack_detection"], "NOT_PERFORMED")
-        self.assertEqual(rows["AAC-01"]["mitigation_evidence"][0]["evidence_status"], "DETECTED")
+        self.assertEqual(rows["AAC-01"]["applicability"]["status"], "APPLICABLE")
+        self.assertEqual(
+            rows["AAC-01"]["class_evidence"]["mapped_concerns"][0]["category"],
+            "INPUT_SECURITY",
+        )
+        self.assertEqual(rows["AAC-01"]["class_evidence"]["attack_detection"], "NOT_PERFORMED")
 
-        self.assertEqual(rows["AAC-11"]["assessment_status"], "EVIDENCE_CHAIN")
-        self.assertEqual(rows["AAC-11"]["mitigation_evidence"][0]["evidence_status"], "NOT_DETECTED")
+        # Class evidence and mitigation state are independent axes. The mapped
+        # concern does not hide the C12 NOT_DETECTED repository status.
+        self.assertEqual(rows["AAC-11"]["class_evidence"]["status"], "OBSERVED")
+        sandbox = next(
+            item for item in rows["AAC-11"]["mitigation_evidence"]
+            if item["mitigation_id"] == "tool-sandbox"
+        )
+        self.assertEqual(sandbox["mapped_controls"][0]["repository_status"], "NOT_DETECTED")
 
-        self.assertEqual(rows["AAC-20"]["assessment_status"], "NOT_OBSERVED")
-        self.assertEqual(rows["AAC-20"]["mapped_risks"], [])
+        self.assertEqual(rows["AAC-20"]["applicability"]["status"], "NOT_ESTABLISHED")
+        self.assertEqual(rows["AAC-20"]["class_evidence"]["mapped_concerns"], [])
 
     def test_relevant_unassessed_is_not_misreported_as_safe(self):
         catalog = {
@@ -200,9 +229,10 @@ class TestMatrixMapping(unittest.TestCase):
         }
         result = map_report_to_asi(self._report(), catalog)
         row = result["classes"][0]
-        self.assertEqual(row["assessment_status"], "RELEVANT_UNASSESSED")
-        self.assertEqual(row["attack_detection"], "NOT_PERFORMED")
-        self.assertIn("does not prove", row["limitations"])
+        self.assertEqual(row["applicability"]["status"], "APPLICABLE")
+        self.assertEqual(row["class_evidence"]["status"], "NOT_OBSERVED")
+        self.assertEqual(row["class_evidence"]["attack_detection"], "NOT_PERFORMED")
+        self.assertEqual(row["manual_review"]["status"], "REQUIRED")
 
     def test_unscored_report_does_not_gain_numeric_fields_in_mapping(self):
         report = self._report()
@@ -222,11 +252,98 @@ class TestMatrixMapping(unittest.TestCase):
         }
 
         result = map_report_to_asi(report, catalog)
-        mapped = result["classes"][0]["mapped_risks"][0]
+        mapped = result["classes"][0]["class_evidence"]["mapped_concerns"][0]
 
         self.assertNotIn("score", mapped)
         self.assertNotIn("severity", mapped)
         self.assertEqual(mapped["reachability_status"], "STATICALLY_INFERRED")
+
+    def test_conflicting_controls_are_preserved_without_aggregation(self):
+        catalog = {
+            "source": "fixture",
+            "metadata": {},
+            "classes": [
+                {
+                    "id": "AAC-07",
+                    "name": "Scope Creep",
+                    "protocols": ["Native"],
+                    "proposedMitigationIds": ["least-privilege"],
+                }
+            ],
+        }
+
+        row = map_report_to_asi(self._report(), catalog)["classes"][0]
+        controls = row["mitigation_evidence"][0]["mapped_controls"]
+        statuses = {item["control_id"]: item["repository_status"] for item in controls}
+
+        self.assertEqual(statuses["C05"], "DETECTED")
+        self.assertEqual(statuses["C12"], "NOT_DETECTED")
+        self.assertNotIn("evidence_status", row["mitigation_evidence"][0])
+
+    def test_protocol_applicability_has_positive_and_negative_fixtures(self):
+        positives = {
+            "Native": {"ai_usage": [{"id": "F1", "file": "app.py", "name": "call", "evidence": "model call"}]},
+            "MCP": {"mcp": [{"id": "F1", "file": "mcp.json", "name": "MCP", "evidence": "mcp server"}]},
+            "RAG": {"rag_retrieval": [{"id": "F1", "file": "rag.py", "name": "vector", "evidence": "retrieval"}]},
+            "A2A": {"integration": [{"id": "F1", "file": "card.json", "name": "Agent Card", "evidence": "A2A Agent Card"}]},
+            "ANP": {"integration": [{"id": "F1", "file": "network.py", "name": "ANP", "evidence": "Agent Network Protocol"}]},
+            "Skills": {"integration": [{"id": "F1", "file": "skills/review/SKILL.md", "name": "Agent skill", "evidence": "skill manifest"}]},
+        }
+        for protocol, categories in positives.items():
+            with self.subTest(protocol=protocol):
+                positive = self._report()
+                positive.ai_inventory = {"categories": categories}
+                positive.risks = {"scenarios": []}
+                catalog = {
+                    "source": "fixture",
+                    "metadata": {},
+                    "classes": [{"id": "AAC-X", "name": "x", "protocols": [protocol]}],
+                }
+                positive_row = map_report_to_asi(positive, catalog)["classes"][0]
+                self.assertEqual(positive_row["applicability"]["status"], "APPLICABLE")
+                self.assertTrue(positive_row["applicability"]["basis"])
+
+                negative = self._report()
+                negative.ai_inventory = {"categories": {}}
+                negative.risks = {"scenarios": []}
+                negative_row = map_report_to_asi(negative, catalog)["classes"][0]
+                self.assertEqual(negative_row["applicability"]["status"], "NOT_ESTABLISHED")
+                self.assertEqual(negative_row["applicability"]["basis"], [])
+
+
+class TestPinnedFortyClassCatalog(unittest.TestCase):
+    def setUp(self):
+        self.catalog = load_asi_catalog(FIXTURES / "asi-catalog-40.json")
+        self.matrix = map_report_to_asi(_real_report("basic-chatbot"), self.catalog)
+
+    def test_golden_catalog_identity_and_summary(self):
+        self.assertEqual(self.matrix["schema_version"], "2.0")
+        self.assertEqual(self.matrix["catalog"]["version"], "0.2.0-draft")
+        self.assertEqual(self.matrix["catalog"]["status"], "draft")
+        self.assertTrue(self.matrix["catalog"]["independent_review"]["pending"])
+        self.assertEqual(
+            self.matrix["catalog"]["source_hash"],
+            "sha256:034806b3bd7f423de7369c0651b985ebfb1dfe87eb0eb85cd0b1f776c7ccdc15",
+        )
+        self.assertEqual(self.matrix["summary"]["class_count"], 40)
+        self.assertEqual(
+            [row["id"] for row in self.matrix["classes"]],
+            [f"AAC-{number:02d}" for number in range(1, 41)],
+        )
+
+    def test_basic_chatbot_gets_no_unrelated_class_gap_verdicts(self):
+        rows = {row["id"]: row for row in self.matrix["classes"]}
+        for class_id in ("AAC-17", "AAC-29", "AAC-35", "AAC-39"):
+            with self.subTest(class_id=class_id):
+                row = rows[class_id]
+                self.assertEqual(row["class_evidence"]["status"], "NOT_OBSERVED")
+                self.assertEqual(row["class_evidence"]["mapped_concerns"], [])
+                self.assertNotIn("assessment_status", row)
+                self.assertNotIn("CONTROL_GAP", json.dumps(row))
+
+    def test_catalog_review_warning_is_machine_visible(self):
+        self.assertEqual(self.matrix["catalog"]["status"], "draft")
+        self.assertTrue(self.matrix["catalog"]["independent_review"]["pending"])
 
 
 if __name__ == "__main__":

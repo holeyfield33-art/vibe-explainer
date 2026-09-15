@@ -100,22 +100,76 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _asi_text_summary(matrix: dict) -> str:
     summary = matrix["summary"]
+    catalog = matrix["catalog"]
     protocols = ", ".join(matrix.get("detected_protocols", [])) or "none detected"
+    review = catalog.get("independent_review") or {}
+    review_status = "PENDING" if review.get("pending") else "NOT MARKED PENDING"
     return "\n".join(
         [
             "",
             "AGENT SECURITY INDEX MATRIX",
             "---------------------------",
-            f"Catalog: {matrix.get('catalog_version') or 'version not provided'}",
+            f"Catalog: {catalog.get('version') or 'version not provided'} ({catalog.get('status') or 'status not provided'})",
+            f"Independent review: {review_status}",
+            f"Catalog source hash: {catalog.get('source_hash') or 'not available'}",
             f"Detected protocols: {protocols}",
-            f"Evidence-linked classes: {summary['EVIDENCE_CHAIN']}",
-            f"Control-gap classes: {summary['CONTROL_GAP']}",
-            f"Control-evidence classes: {summary['CONTROL_EVIDENCE']}",
-            f"Relevant but unassessed: {summary['RELEVANT_UNASSESSED']}",
-            f"Not observed by this static mapping: {summary['NOT_OBSERVED']}",
+            f"Applicable classes: {summary['applicable']}",
+            f"Applicability not established: {summary['applicability_not_established']}",
+            f"Classes with specific evidence: {summary['class_evidence_observed']}",
+            f"Manual review required: {summary['manual_review_required']}",
             "Full row-level mapping is included when --json is used.",
         ]
     )
+
+
+def _asi_markdown(matrix: dict) -> str:
+    """Render the complete ASI row mapping for the detailed analyst report."""
+    catalog = matrix["catalog"]
+    review = catalog.get("independent_review") or {}
+    review_status = "PENDING" if review.get("pending") else "NOT MARKED PENDING"
+
+    def cell(value: object) -> str:
+        return str(value or "").replace("|", "\\|").replace("\n", " ")
+
+    lines = [
+        "",
+        "---",
+        "",
+        "## Agent Security Index Evidence Mapping",
+        "",
+        f"> **Catalog status: {cell(catalog.get('status') or 'unknown').upper()}. "
+        f"Independent review: {review_status}.** "
+        "This mapping is an analyst aid, not ASI validation or attack detection.",
+        "",
+        f"- **Catalog version:** {cell(catalog.get('version') or 'not provided')}",
+        f"- **Catalog source hash:** `{cell(catalog.get('source_hash') or 'not available')}`",
+        f"- **Detected protocols:** {cell(', '.join(matrix.get('detected_protocols', [])) or 'none')}",
+        "",
+        "| Class | Applicability | Basis | Class evidence | Per-control mitigation signals | Manual review |",
+        "|---|---|---|---|---|---|",
+    ]
+    for row in matrix["classes"]:
+        applicability = row["applicability"]
+        basis = ", ".join(applicability.get("matched_protocols", [])) or "none established"
+        class_evidence = row["class_evidence"]
+        concern_count = len(class_evidence.get("mapped_concerns", []))
+        evidence_text = f"{class_evidence['status']} ({concern_count} concern(s))"
+        control_signals: list[str] = []
+        for mitigation in row["mitigation_evidence"]:
+            for control in mitigation["mapped_controls"]:
+                control_signals.append(
+                    f"{control['control_id']}:{control['repository_status']}"
+                )
+        signals = ", ".join(sorted(set(control_signals))) or "unassessed"
+        lines.append(
+            f"| `{cell(row['id'])}` {cell(row.get('name'))} | "
+            f"{cell(applicability['status'])} | {cell(basis)} | {cell(evidence_text)} | "
+            f"{cell(signals)} | {cell(row['manual_review']['status'])} |"
+        )
+    lines.extend(["", "Protocol applicability, class-specific evidence, and mitigation-control "
+                  "signals are independent axes. A control status is never promoted to an ASI "
+                  "class verdict, and conflicting statuses remain visible."])
+    return "\n".join(lines)
 
 
 def _run_security_mode(
@@ -180,7 +234,7 @@ def _run_security_mode(
     elif as_consultant:
         output = render_consultant_markdown(report)
         if asi_matrix is not None:
-            output += _asi_text_summary(asi_matrix)
+            output += _asi_markdown(asi_matrix)
     else:
         output = render_text(report)
         if asi_matrix is not None:

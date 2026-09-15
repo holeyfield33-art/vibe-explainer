@@ -396,6 +396,37 @@ class TestCLI(unittest.TestCase):
             }
             self.assertNotIn("review.json", files)
 
+    def test_asi_catalog_status_is_prominent_in_terminal_output(self):
+        result = self._run(
+            str(FIXTURES / "basic-chatbot"),
+            "--asi-catalog", str(FIXTURES / "asi-catalog-40.json"),
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Catalog: 0.2.0-draft (draft)", result.stdout)
+        self.assertIn("Independent review: PENDING", result.stdout)
+        self.assertIn("Catalog source hash: sha256:", result.stdout)
+
+    def test_asi_row_mapping_is_in_detailed_report(self):
+        result = self._run(
+            str(FIXTURES / "basic-chatbot"), "--report",
+            "--asi-catalog", str(FIXTURES / "asi-catalog-40.json"),
+        )
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("## Agent Security Index Evidence Mapping", result.stdout)
+        self.assertIn("**Catalog status: DRAFT. Independent review: PENDING.**", result.stdout)
+        self.assertIn("`AAC-40` Telemetry Blind Spots", result.stdout)
+
+    def test_asi_catalog_provenance_is_in_json(self):
+        result = self._run(
+            str(FIXTURES / "basic-chatbot"), "--json",
+            "--asi-catalog", str(FIXTURES / "asi-catalog-40.json"),
+        )
+        self.assertEqual(result.returncode, 0)
+        matrix = json.loads(result.stdout)["asi_matrix"]
+        self.assertEqual(matrix["catalog"]["status"], "draft")
+        self.assertTrue(matrix["catalog"]["independent_review"]["pending"])
+        self.assertTrue(matrix["catalog"]["source_hash"].startswith("sha256:"))
+
     def test_high_risk_repo_still_exits_zero(self):
         result = self._run(str(FIXTURES / "agent-with-tools"), "--security", "--json")
         self.assertEqual(result.returncode, 0)

@@ -22,6 +22,11 @@ attack-surface leads, inferred relationships, unscored concern scenarios, contro
 artifacts, an unscored process-evidence checklist, recommendations, evidence appendix,
 and limitations.
 
+When `--asi-catalog` is supplied, the detailed report also includes every ASI row with
+its applicability basis, class-specific concern count, individual mapped-control states,
+and manual-review disposition. Catalog draft and independent-review status are displayed
+as a warning with a SHA-256 source identifier.
+
 Every important row carries a finding, relationship, control, or concern ID that can be
 traced to repository evidence. Traceability supports review; it does not convert heuristic
 evidence into proof of exploitability or control effectiveness.

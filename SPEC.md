@@ -41,7 +41,8 @@ Every output exposes the applicable subset of:
    enforcement and effectiveness.
 9. Recommendations linked to evidence IDs.
 10. Limitations, coverage gaps, aggregation counts, and unsupported analysis.
-11. Optional ASI mapping with catalog provenance and mapping limitations.
+11. Optional ASI mapping with catalog provenance and independent applicability,
+    class-evidence, mitigation-control, assumption, and manual-review axes.
 
 All advertised JSON fields must be serialized. Human-readable output may summarize but
 must preserve references to the complete machine-readable evidence.
@@ -60,6 +61,9 @@ must preserve references to the complete machine-readable evidence.
 - Production context reached through fallback must be distinguished from positively
   classified context.
 - Unsupported-language lexical leads cannot drive authoritative conclusions.
+- ASI protocol compatibility establishes applicability only. It cannot create a class
+  finding, control gap, mitigation verdict, or attack-detection claim.
+- Conflicting controls mapped to one ASI mitigation remain individually visible.
 
 Numeric scores, severity bands, and four-level process classifications are absent from
 default output. They remain available only through `--experimental-scoring` for research

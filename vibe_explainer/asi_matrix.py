@@ -9,11 +9,13 @@ effectiveness, or ASI validation.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "2.0"
 
 # Vibe control -> ASI mitigation evidence bridges. These mean only that a Vibe
 # control can provide repository evidence relevant to the mitigation.
@@ -38,16 +40,6 @@ _RISK_CATEGORY_TO_AAC: dict[str, tuple[str, ...]] = {
     "SECRET_EXPOSURE": ("AAC-09",),
     "HIGH_IMPACT_ACTION": ("AAC-11", "AAC-16"),
 }
-
-_STATUS_RANK = {
-    "DETECTED": 4,
-    "PARTIAL": 3,
-    "NOT_DETECTED": 2,
-    "UNKNOWN": 1,
-    "NOT_APPLICABLE": 0,
-    "UNASSESSED": -1,
-}
-
 
 def _load_json(path: Path) -> Any:
     try:
@@ -112,23 +104,28 @@ def load_asi_catalog(path: str | Path) -> dict[str, Any]:
     source = Path(path)
     metadata: dict[str, Any] = {}
     classes: list[dict[str, Any]] = []
+    source_files: list[Path] = []
 
     if source.is_dir():
         meta_path = source / "catalog-meta.json"
         if meta_path.is_file():
+            source_files.append(meta_path)
             meta_payload = _load_json(meta_path)
             if isinstance(meta_payload, dict):
                 metadata = meta_payload
 
         combined = source / "asi-catalog.json"
         if combined.is_file():
+            source_files = [combined]
             payload = _load_json(combined)
             classes = _extract_attack_classes(payload)
             metadata = metadata or _extract_metadata(payload)
         else:
             for fragment in sorted(source.glob("attack-classes*.json")):
+                source_files.append(fragment)
                 classes.extend(_extract_attack_classes(_load_json(fragment)))
     else:
+        source_files = [source]
         payload = _load_json(source)
         classes = _extract_attack_classes(payload)
         metadata = _extract_metadata(payload)
@@ -154,31 +151,59 @@ def load_asi_catalog(path: str | Path) -> dict[str, Any]:
         )
 
     classes.sort(key=lambda row: str(row.get("id", "")))
-    return {"metadata": metadata, "classes": classes, "source": str(source)}
+    digest = hashlib.sha256()
+    for source_file in sorted(source_files, key=lambda item: item.name):
+        digest.update(source_file.name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(source_file.read_bytes())
+        digest.update(b"\0")
+    return {
+        "metadata": metadata,
+        "classes": classes,
+        "source": str(source),
+        "source_hash": f"sha256:{digest.hexdigest()}",
+        "source_files": [str(item) for item in source_files],
+    }
 
 
-def _detected_protocols(report: Any) -> list[str]:
-    protocols: set[str] = set()
+def _protocol_observations(report: Any) -> dict[str, list[dict[str, Any]]]:
+    """Return explicit repository evidence for each supported protocol family."""
+    observations: dict[str, list[dict[str, Any]]] = {}
     categories = report.ai_inventory.get("categories", {})
-    if categories.get("ai_usage") or categories.get("tool_agent"):
-        protocols.add("Native")
-    if categories.get("mcp"):
-        protocols.add("MCP")
-    if categories.get("rag_retrieval"):
-        protocols.add("RAG")
 
-    searchable: list[str] = []
-    for items in categories.values():
+    def add(protocol: str, category: str, item: dict[str, Any], reason: str) -> None:
+        row = {
+            "evidence_type": "REPOSITORY_FINDING",
+            "category": category,
+            "finding_id": item.get("id"),
+            "file": item.get("file"),
+            "reason": reason,
+        }
+        if row not in observations.setdefault(protocol, []):
+            observations[protocol].append(row)
+
+    for category, items in categories.items():
         for item in items:
-            searchable.extend((str(item.get("name", "")), str(item.get("evidence", ""))))
-    joined = "\n".join(searchable).lower()
-    if "a2a" in joined or "agent card" in joined:
-        protocols.add("A2A")
-    if "agent network protocol" in joined or " anp " in f" {joined} ":
-        protocols.add("ANP")
-    if "skill" in joined:
-        protocols.add("Skills")
-    return sorted(protocols)
+            if category in {"ai_usage", "tool_agent"}:
+                add("Native", category, item, "Native model/tool integration evidence observed.")
+            if category == "mcp":
+                add("MCP", category, item, "MCP-specific repository evidence observed.")
+            if category == "rag_retrieval":
+                add("RAG", category, item, "Retrieval/RAG repository evidence observed.")
+
+            searchable = " ".join(
+                str(item.get(key, "")) for key in ("name", "evidence", "file")
+            )
+            if re.search(r"(?i)\ba2a\b|agent[ -]?card", searchable):
+                add("A2A", category, item, "A2A or Agent Card evidence observed.")
+            if re.search(r"(?i)agent network protocol|\banp\b", searchable):
+                add("ANP", category, item, "ANP-specific evidence observed.")
+            if re.search(r"(?i)(?:^|[/\\])skills?(?:[/\\]|$)|skill\.md|agent[ -]?skill", searchable):
+                add("Skills", category, item, "Agent-skill artifact evidence observed.")
+
+    for rows in observations.values():
+        rows.sort(key=lambda row: (str(row.get("file")), str(row.get("finding_id"))))
+    return dict(sorted(observations.items()))
 
 
 def _control_statuses(report: Any) -> dict[str, dict[str, Any]]:
@@ -191,6 +216,8 @@ def _control_statuses(report: Any) -> dict[str, dict[str, Any]]:
                     "status": status,
                     "name": control.get("name"),
                     "confidence": control.get("confidence"),
+                    "related_finding_ids": list(control.get("related_finding_ids", [])),
+                    "related_dataflow_ids": list(control.get("related_dataflow_ids", [])),
                 }
     return result
 
@@ -203,39 +230,37 @@ def _mitigation_to_controls() -> dict[str, list[str]]:
     return result
 
 
-def _best_control_status(
+def _mapped_control_evidence(
     control_ids: list[str], controls: dict[str, dict[str, Any]]
-) -> tuple[str, list[dict[str, Any]]]:
-    best = "UNASSESSED"
-    best_rank = _STATUS_RANK[best]
+) -> list[dict[str, Any]]:
+    """Return every mapped control independently; never collapse contradictions."""
     evidence: list[dict[str, Any]] = []
-    for control_id in control_ids:
+    for control_id in sorted(control_ids):
         control = controls.get(control_id)
         if not control:
             continue
         status = str(control.get("status", "UNKNOWN"))
-        rank = _STATUS_RANK.get(status, 0)
-        if rank > best_rank:
-            best, best_rank = status, rank
         evidence.append(
             {
                 "control_id": control_id,
                 "control_name": control.get("name"),
-                "status": status,
+                "repository_status": status,
                 "confidence": control.get("confidence"),
+                "related_finding_ids": list(control.get("related_finding_ids", [])),
+                "related_dataflow_ids": list(control.get("related_dataflow_ids", [])),
             }
         )
-    return best, evidence
+    return evidence
 
 
-def _risk_rows_for_class(report: Any, class_id: str, relevant: bool) -> list[dict[str, Any]]:
+def _risk_rows_for_class(report: Any, class_id: str, applicable: bool) -> list[dict[str, Any]]:
     mapped: list[dict[str, Any]] = []
     for scenario in report.risks.get("scenarios", []):
         category = str(scenario.get("category", ""))
         if class_id not in _RISK_CATEGORY_TO_AAC.get(category, ()):
             continue
         # AAC-16 specifically concerns MCP STDIO; a generic shell path is not enough.
-        if class_id == "AAC-16" and not relevant:
+        if class_id == "AAC-16" and not applicable:
             continue
         row = {
             "risk_id": scenario.get("risk_id"),
@@ -258,19 +283,20 @@ def _risk_rows_for_class(report: Any, class_id: str, relevant: bool) -> list[dic
 
 
 def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
-    """Map one completed Vibe security report to every loaded ASI class."""
-    protocols = _detected_protocols(report)
-    protocol_set = set(protocols)
+    """Map one report to ASI without collapsing independent evidence axes."""
+    protocol_observations = _protocol_observations(report)
+    protocols = sorted(protocol_observations)
+    protocol_set = set(protocol_observations)
     controls = _control_statuses(report)
     mitigation_controls = _mitigation_to_controls()
-    ai_surface_detected = report.executive_summary.get("ai_surface") == "DETECTED"
 
     counts = {
-        "EVIDENCE_CHAIN": 0,
-        "CONTROL_GAP": 0,
-        "CONTROL_EVIDENCE": 0,
-        "RELEVANT_UNASSESSED": 0,
-        "NOT_OBSERVED": 0,
+        "applicable": 0,
+        "applicability_not_established": 0,
+        "class_evidence_observed": 0,
+        "class_evidence_not_observed": 0,
+        "manual_review_required": 0,
+        "manual_review_deferred": 0,
     }
     rows: list[dict[str, Any]] = []
 
@@ -278,42 +304,65 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
         class_id = str(attack_class.get("id", ""))
         class_protocols = [str(p) for p in attack_class.get("protocols", [])]
         matched_protocols = sorted(protocol_set.intersection(class_protocols))
-        relevant = bool(matched_protocols)
-        if not relevant and ai_surface_detected and "Native" in class_protocols:
-            relevant = True
-            matched_protocols = ["Native"]
+        applicable = bool(matched_protocols)
+        applicability_basis = [
+            {
+                "basis_type": "PROTOCOL_EVIDENCE",
+                "protocol": protocol,
+                "observations": protocol_observations[protocol],
+            }
+            for protocol in matched_protocols
+        ]
+        if applicable:
+            counts["applicable"] += 1
+        else:
+            counts["applicability_not_established"] += 1
 
-        mapped_risks = _risk_rows_for_class(report, class_id, relevant)
+        mapped_risks = _risk_rows_for_class(report, class_id, applicable)
+        class_evidence_status = "OBSERVED" if mapped_risks else "NOT_OBSERVED"
+        counts[f"class_evidence_{class_evidence_status.lower()}"] += 1
         proposed = [str(mid) for mid in attack_class.get("proposedMitigationIds", [])]
         mitigation_evidence: list[dict[str, Any]] = []
         for mitigation_id in proposed:
-            status, control_evidence = _best_control_status(
+            control_evidence = _mapped_control_evidence(
                 mitigation_controls.get(mitigation_id, []), controls
             )
             mitigation_evidence.append(
                 {
                     "mitigation_id": mitigation_id,
-                    "evidence_status": status,
                     "mapped_controls": control_evidence,
-                    "note": "Repository evidence only; this does not validate ASI mitigation effectiveness.",
+                    "mapping_basis": "STATIC_CONTROL_TO_MITIGATION_CROSSWALK",
+                    "review_status": "REQUIRED" if control_evidence else "UNASSESSED",
+                    "note": (
+                        "Each control status is shown independently. Repository evidence does "
+                        "not validate mitigation implementation or effectiveness for this class."
+                    ),
                 }
             )
 
-        assessed = [m for m in mitigation_evidence if m["evidence_status"] != "UNASSESSED"]
-        has_gap = any(m["evidence_status"] == "NOT_DETECTED" for m in assessed)
-        has_control = any(m["evidence_status"] in {"DETECTED", "PARTIAL"} for m in assessed)
-
-        if mapped_risks:
-            status = "EVIDENCE_CHAIN"
-        elif relevant and has_gap:
-            status = "CONTROL_GAP"
-        elif relevant and has_control:
-            status = "CONTROL_EVIDENCE"
-        elif relevant:
-            status = "RELEVANT_UNASSESSED"
+        unresolved = [
+            "Static repository review does not establish runtime exposure, exploitability, or attack presence.",
+            "Mapped control artifacts do not establish mitigation enforcement or effectiveness.",
+        ]
+        if applicable:
+            unresolved.append(
+                "Protocol evidence establishes technical applicability only, not class-specific exposure."
+            )
         else:
-            status = "NOT_OBSERVED"
-        counts[status] += 1
+            unresolved.append(
+                "No supported protocol evidence established applicability; external or deployed configuration was not assessed."
+            )
+        if not mapped_risks:
+            unresolved.append("No class-specific Vibe evidence bridge was observed.")
+
+        if applicable or mapped_risks:
+            review_status = "REQUIRED"
+            review_reason = "Applicability or class-specific evidence requires analyst disposition."
+            counts["manual_review_required"] += 1
+        else:
+            review_status = "DEFERRED"
+            review_reason = "Applicability was not established by supported repository evidence."
+            counts["manual_review_deferred"] += 1
 
         rows.append(
             {
@@ -321,35 +370,45 @@ def map_report_to_asi(report: Any, catalog: dict[str, Any]) -> dict[str, Any]:
                 "name": attack_class.get("name"),
                 "family": attack_class.get("family") or attack_class.get("vector"),
                 "protocols": class_protocols,
-                "matched_protocols": matched_protocols,
                 "evidence_tier": attack_class.get("evidenceTier"),
                 "catalog_decision": attack_class.get("decision"),
-                "assessment_status": status,
-                "attack_detection": "NOT_PERFORMED",
-                "mapped_risks": mapped_risks,
+                "applicability": {
+                    "status": "APPLICABLE" if applicable else "NOT_ESTABLISHED",
+                    "matched_protocols": matched_protocols,
+                    "basis": applicability_basis,
+                },
+                "class_evidence": {
+                    "status": class_evidence_status,
+                    "attack_detection": "NOT_PERFORMED",
+                    "mapped_concerns": mapped_risks,
+                },
                 "mitigation_evidence": mitigation_evidence,
-                "limitations": (
-                    "Vibe maps repository evidence to this ASI row; it does not prove the attack "
-                    "exists, is exploitable, or is prevented."
-                ),
+                "unresolved_assumptions": unresolved,
+                "manual_review": {"status": review_status, "reason": review_reason},
             }
         )
 
     metadata = catalog.get("metadata", {})
+    independent_review = metadata.get("independentReview", {}) if isinstance(metadata, dict) else {}
     return {
         "schema_version": SCHEMA_VERSION,
         "repository": report.metadata.get("repository"),
         "assessment_completeness": report.metadata.get("assessment_completeness"),
-        "catalog_source": catalog.get("source"),
-        "catalog_version": metadata.get("version") if isinstance(metadata, dict) else None,
-        "catalog_status": metadata.get("status") if isinstance(metadata, dict) else None,
+        "catalog": {
+            "source": catalog.get("source"),
+            "source_hash": catalog.get("source_hash"),
+            "version": metadata.get("version") if isinstance(metadata, dict) else None,
+            "status": metadata.get("status") if isinstance(metadata, dict) else None,
+            "independent_review": independent_review,
+        },
         "detected_protocols": protocols,
+        "protocol_evidence": protocol_observations,
         "summary": {"class_count": len(rows), **counts},
         "classes": rows,
         "limitations": [
             "This is a static repository-evidence mapping, not runtime attack detection.",
-            "NOT_OBSERVED means Vibe did not observe a matching protocol/evidence bridge; it does not mean the class is impossible.",
-            "CONTROL_EVIDENCE means related control evidence exists; it does not establish mitigation effectiveness or ASI validation.",
-            "Only explicit Vibe-to-ASI bridges are used; unsupported ASI rows remain relevant/unassessed rather than receiving synthetic confidence.",
+            "NOT_ESTABLISHED applicability is not a claim that the class is impossible.",
+            "Mitigation mappings preserve every control status and do not aggregate them into a class verdict.",
+            "Only explicit Vibe-to-ASI evidence bridges are used; protocol compatibility alone never becomes a control gap.",
         ],
     }
