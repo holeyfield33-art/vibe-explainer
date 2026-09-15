@@ -14,7 +14,7 @@ class TestCatalogLoading(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "catalog-meta.json").write_text(
-                json.dumps({"version": "0.2.0-draft", "status": "draft"}),
+                json.dumps({"version": "0.2.0-draft", "status": "draft", "classCount": 2}),
                 encoding="utf-8",
             )
             (root / "attack-classes-01.json").write_text(
@@ -33,6 +33,48 @@ class TestCatalogLoading(unittest.TestCase):
             catalog = load_asi_catalog(root)
             self.assertEqual([row["id"] for row in catalog["classes"]], ["AAC-01", "AAC-09"])
             self.assertEqual(catalog["metadata"]["version"], "0.2.0-draft")
+
+    def test_loads_generated_combined_catalog_shape(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "asi-catalog.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "catalog": {
+                            "version": "0.2.0-draft",
+                            "status": "draft",
+                            "classCount": 1,
+                        },
+                        "attackClasses": [
+                            {
+                                "id": "AAC-01",
+                                "name": "Direct Prompt Injection",
+                                "protocols": ["Native"],
+                                "mitigations": ["untrusted-io"],
+                            }
+                        ],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            catalog = load_asi_catalog(path)
+            self.assertEqual(catalog["metadata"]["version"], "0.2.0-draft")
+            self.assertEqual(catalog["classes"][0]["proposedMitigationIds"], ["untrusted-io"])
+
+    def test_rejects_incomplete_declared_catalog(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "catalog-meta.json").write_text(
+                json.dumps({"version": "0.2.0-draft", "classCount": 40}),
+                encoding="utf-8",
+            )
+            (root / "attack-classes-01.json").write_text(
+                json.dumps([{"id": "AAC-01", "name": "x", "protocols": ["Native"]}]),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "Incomplete ASI catalog export"):
+                load_asi_catalog(root)
 
     def test_rejects_duplicate_ids(self):
         with tempfile.TemporaryDirectory() as tmp:
