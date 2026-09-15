@@ -213,7 +213,8 @@ class TestInlineCredentialRedactionEndToEnd(unittest.TestCase):
         discovery, _ = self._build_report()
         evidence = " ".join(f.evidence for f in discovery.findings)
         self.assertIn("create_engine", evidence)
-        self.assertIn("[REDACTED]", evidence)
+        self.assertNotIn("vectordb.internal", evidence)
+        self.assertNotIn("DB_PASSWORD", evidence)
 
     def test_raw_secret_absent_from_json_output(self):
         _, report = self._build_report()
@@ -222,7 +223,7 @@ class TestInlineCredentialRedactionEndToEnd(unittest.TestCase):
             self.assertNotIn(secret, js)
         # The partial-password remainder after the first '@' must not leak either.
         self.assertNotIn("Secret@vectordb", js)
-        self.assertIn("[REDACTED]", js)
+        self.assertNotIn("vectordb.internal", js)
 
     def test_raw_secret_absent_from_consultant_markdown(self):
         from vibe_explainer.consultant_report import render_consultant_markdown
@@ -232,7 +233,7 @@ class TestInlineCredentialRedactionEndToEnd(unittest.TestCase):
         for secret in self.RAW_SECRETS:
             self.assertNotIn(secret, md)
         self.assertNotIn("Secret@vectordb", md)
-        self.assertIn("[REDACTED]", md)
+        self.assertNotIn("vectordb.internal", md)
 
 
 if __name__ == "__main__":

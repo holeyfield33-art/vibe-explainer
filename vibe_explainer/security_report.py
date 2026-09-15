@@ -23,7 +23,7 @@ from .controls import ControlAssessment
 from .dataflow import DataFlowGraph
 from .readiness import NO_AI_SURFACE, ReadinessAssessment
 from .risk import RiskAssessment
-from .security_utils import redact_secrets
+from .security_utils import redact_secrets, redact_structure
 
 _SEVERITY_ORDER = {"CRITICAL": 0, "HIGH": 1, "MODERATE": 2, "LOW": 3}
 _LEVEL_ORDER = (1, 2, 3, 4)
@@ -39,10 +39,12 @@ _STANDARD_LIMITATIONS = [
     "do not establish runtime data flow.",
     "No runtime verification of any kind — nothing in this pipeline executes the "
     "target application or confirms a path is actually reachable.",
-    "Control evidence remains primarily keyword/path/proximity-based; a differently named "
-    "function performing an identical check may be invisible to this scanner.",
+    "Control discovery begins with named patterns and uses conservative Python AST relationships; "
+    "differently named or dynamically wired controls may remain invisible.",
     "This report reflects repository evidence only — practices, controls, or "
     "processes that live outside the scanned repository are not visible here.",
+    "Redaction is defense-in-depth, not a guarantee. Treat generated reports as sensitive, "
+    "restrict access, define a retention period, and securely delete them when no longer needed.",
 ]
 
 
@@ -81,7 +83,7 @@ class VibeExplainerReport:
     limitations: list[str]
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return redact_structure({
             "metadata": self.metadata,
             "executive_summary": self.executive_summary,
             "ai_inventory": self.ai_inventory,
@@ -92,7 +94,7 @@ class VibeExplainerReport:
             "readiness": self.readiness,
             "recommendations": self.recommendations,
             "limitations": self.limitations,
-        }
+        })
 
     def to_json(self) -> str:
         """Deterministic, ANSI-free JSON serialization of the complete report."""
@@ -532,7 +534,7 @@ def render_text(report: VibeExplainerReport) -> str:
         add("")
         add(sep)
         _render_limitations(add, report)
-        return "\n".join(lines)
+        return redact_secrets("\n".join(lines))
 
     add(f"FINDINGS\n{es['total_findings']} total "
         f"({es['production_findings']} in production code, "
@@ -598,7 +600,7 @@ def render_text(report: VibeExplainerReport) -> str:
         add(sep)
 
     _render_limitations(add, report)
-    return "\n".join(lines)
+    return redact_secrets("\n".join(lines))
 
 
 def _render_limitations(add, report: VibeExplainerReport) -> None:

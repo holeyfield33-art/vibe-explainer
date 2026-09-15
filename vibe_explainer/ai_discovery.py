@@ -24,7 +24,7 @@ from typing import Any
 
 from .exclusion_policy import walk_pruned
 from .file_context import classify_file
-from .security_utils import redact_secrets
+from .security_utils import minimal_match_excerpt
 
 # Extensions worth content-scanning for AI evidence. Broader than scanner.CODE_EXTS
 # because config/env files are where secrets and MCP transport config tend to live.
@@ -427,12 +427,7 @@ def discover_ai(
                 seen_counts[key] = count + 1
 
                 line_start = text.rfind("\n", 0, match.start()) + 1
-                line_end = text.find("\n", match.start())
-                if line_end == -1:
-                    line_end = len(text)
-                evidence = redact_secrets(text[line_start:line_end].strip())
-                if len(evidence) > 160:
-                    evidence = evidence[:157] + "..."
+                evidence = minimal_match_excerpt(text, match.start(), match.end())
 
                 effective_confidence = confidence
                 # Match-context guard: a dangerous-call token (eval/exec/shell) that

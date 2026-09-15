@@ -51,6 +51,8 @@ The original repository-orientation report is available only through
   and effectiveness remain `UNKNOWN` even when an artifact is observed.
 - Assessment completeness, truncation, excluded/unreadable-file accounting, and explicit
   lower-bound language when coverage is partial.
+- Minimal bounded evidence excerpts plus defense-in-depth redaction. Reports remain
+  sensitive; follow [report handling and retention guidance](docs/REPORT-HANDLING.md).
 - Optional ASI taxonomy mapping from a pinned local catalog. Applicability, class-specific
   evidence, individual control-to-mitigation signals, unresolved assumptions, and manual
   review are separate axes; protocol compatibility alone never becomes a control gap.

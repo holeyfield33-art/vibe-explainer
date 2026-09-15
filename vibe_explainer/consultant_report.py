@@ -16,6 +16,7 @@ from typing import Any
 
 from . import playbook as _pb
 from .security_report import VibeExplainerReport
+from .security_utils import redact_secrets
 
 _SEVERITY_LABEL = {"CRITICAL": "Critical", "HIGH": "High", "MODERATE": "Moderate", "LOW": "Low"}
 _LEVEL_NAME = {1: "Baseline", 2: "Managed", 3: "Hardened", 4: "Continuous"}
@@ -62,7 +63,7 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
             "observation, not an assurance that the repository has no AI functionality or is secure.")
         add("")
         _render_limitations(add, report)
-        return "\n".join(lines)
+        return redact_secrets("\n".join(lines))
 
     experimental = bool(m.get("experimental_scoring_enabled"))
     highest = es.get("highest_risk_severity")
@@ -334,7 +335,7 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
 
     # ---- Limitations ------------------------------------------------------
     _render_limitations(add, report)
-    return "\n".join(lines)
+    return redact_secrets("\n".join(lines))
 
 
 def _render_limitations(add, report: VibeExplainerReport) -> None:

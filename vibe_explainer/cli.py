@@ -11,6 +11,7 @@ from . import __version__
 from .integrate_vibe_check import load_vibe_check_report, summarize_vibe_findings
 from .report import render_markdown
 from .scanner import scan_repo
+from .security_utils import redact_secrets, redact_structure
 
 
 def _print_portable(output: str) -> None:
@@ -223,14 +224,14 @@ def _run_security_mode(
             catalog = load_asi_catalog(asi_catalog)
             asi_matrix = map_report_to_asi(report, catalog)
     except Exception as exc:  # noqa: BLE001 — surface cleanly, never a raw traceback
-        print(f"Unable to analyze repository:\n{exc}", file=sys.stderr)
+        print(redact_secrets(f"Unable to analyze repository:\n{exc}"), file=sys.stderr)
         return 1
 
     if as_json:
         payload = report.to_dict()
         if asi_matrix is not None:
             payload["asi_matrix"] = asi_matrix
-        output = json.dumps(payload, indent=2, sort_keys=False, ensure_ascii=False)
+        output = json.dumps(redact_structure(payload), indent=2, sort_keys=False, ensure_ascii=False)
     elif as_consultant:
         output = render_consultant_markdown(report)
         if asi_matrix is not None:
@@ -240,10 +241,12 @@ def _run_security_mode(
         if asi_matrix is not None:
             output += _asi_text_summary(asi_matrix)
 
+    if not as_json:
+        output = redact_secrets(output)
     if out:
         out_path = Path(out)
         out_path.write_text(output, encoding="utf-8")
-        print(f"Wrote {out_path}", file=sys.stderr)
+        print(redact_secrets(f"Wrote {out_path}"), file=sys.stderr)
     else:
         _print_portable(output)
 
@@ -256,7 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     repo = Path(args.repo).resolve()
     if not repo.is_dir():
-        print(f"error: not a directory: {repo}", file=sys.stderr)
+        print(redact_secrets(f"error: not a directory: {repo}"), file=sys.stderr)
         return 2
 
     if args.vibe_check_report and not args.legacy_mental_model:
@@ -285,26 +288,25 @@ def main(argv: list[str] | None = None) -> int:
     try:
         scan = scan_repo(repo)
     except Exception as exc:  # noqa: BLE001 — surface cleanly to CLI users
-        print(f"error: scan failed: {exc}", file=sys.stderr)
+        print(redact_secrets(f"error: scan failed: {exc}"), file=sys.stderr)
         return 1
 
     vibe_notes: list[str] = []
     if args.vibe_check_report:
         report = load_vibe_check_report(args.vibe_check_report)
         if report is None:
-            print(
-                f"warning: could not load vibe-check report at {args.vibe_check_report}",
-                file=sys.stderr,
-            )
+            print(redact_secrets(
+                f"warning: could not load vibe-check report at {args.vibe_check_report}"
+            ), file=sys.stderr)
         else:
             vibe_notes = summarize_vibe_findings(report)
 
-    md = render_markdown(scan, vibe_notes=vibe_notes, offline=True)
+    md = redact_secrets(render_markdown(scan, vibe_notes=vibe_notes, offline=True))
 
     if args.out:
         out_path = Path(args.out)
         out_path.write_text(md, encoding="utf-8")
-        print(f"Wrote {out_path}", file=sys.stderr)
+        print(redact_secrets(f"Wrote {out_path}"), file=sys.stderr)
     else:
         _print_portable(md)
 

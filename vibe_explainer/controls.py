@@ -40,7 +40,7 @@ from .ai_discovery import AIFinding, DiscoveryResult, MAX_FILE_BYTES, _iter_cand
 from .attack_surface import AttackSurfaceResult
 from .dataflow import DataFlowGraph, DataFlowObservation
 from .exclusion_policy import safe_regular_file_size, walk_pruned
-from .security_utils import redact_secrets
+from .security_utils import minimal_match_excerpt
 
 STATUS_EVIDENCE_FOUND = "EVIDENCE_FOUND"
 STATUS_PARTIAL = "PARTIAL"
@@ -206,15 +206,8 @@ def _iter_doc_files(root_path: Path):
                 yield full
 
 
-def _line_evidence_text(text: str, start: int) -> str:
-    line_start = text.rfind("\n", 0, start) + 1
-    line_end = text.find("\n", start)
-    if line_end == -1:
-        line_end = len(text)
-    evidence = redact_secrets(text[line_start:line_end].strip())
-    if len(evidence) > 160:
-        evidence = evidence[:157] + "..."
-    return evidence
+def _line_evidence_text(text: str, start: int, end: int | None = None) -> str:
+    return minimal_match_excerpt(text, start, end if end is not None else start + 1)
 
 
 def _scan_code_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
@@ -227,7 +220,7 @@ def _scan_code_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
         for control_id, tag, pattern, confidence in _CODE_EVIDENCE_PATTERNS:
             for match in pattern.finditer(text):
                 line_no = text.count("\n", 0, match.start()) + 1
-                evidence_text = _line_evidence_text(text, match.start())
+                evidence_text = _line_evidence_text(text, match.start(), match.end())
                 by_control.setdefault(control_id, []).append(
                     _EvidenceMatch(file=rel, line=line_no, tag=tag, confidence=confidence, text=evidence_text)
                 )
@@ -248,7 +241,7 @@ def _scan_doc_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
         for control_id, tag, pattern, confidence in _DOC_EVIDENCE_PATTERNS:
             for match in pattern.finditer(text):
                 line_no = text.count("\n", 0, match.start()) + 1
-                evidence_text = _line_evidence_text(text, match.start())
+                evidence_text = _line_evidence_text(text, match.start(), match.end())
                 by_control.setdefault(control_id, []).append(
                     _EvidenceMatch(file=rel, line=line_no, tag=tag, confidence=confidence, text=evidence_text)
                 )
