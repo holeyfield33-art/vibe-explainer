@@ -432,6 +432,9 @@ def render_text(report: VibeExplainerReport) -> str:
     add(f"FINDINGS\n{es['total_findings']} total "
         f"({es['production_findings']} in production code, "
         f"{es['total_findings'] - es['production_findings']} in test/example/docs/generated)")
+    if es.get("defaulted_production_findings"):
+        add(f"{es['defaulted_production_findings']} production finding(s) were classified by "
+            "conservative default; confirm during analyst review.")
     add("")
     add(f"RISKS\n{es['risk_scenario_count']} scenario(s)")
     add(f"Highest: {es['highest_risk_severity'] or 'none'}")

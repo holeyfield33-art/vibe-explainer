@@ -302,6 +302,10 @@ class TestTextRendering(unittest.TestCase):
             self.assertIn("VIBE EXPLAINER", text)
             self.assertNotIn("\x1b[", text)
 
+    def test_defaulted_production_context_is_visible(self):
+        text = render_text(_report("basic-chatbot"))
+        self.assertIn("classified by conservative default", text)
+
 
 class TestCLI(unittest.TestCase):
     def _run(self, *args):
