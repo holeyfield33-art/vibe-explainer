@@ -8,7 +8,7 @@
 - **Review scope:** Static repository evidence — AI components, attack-surface leads, inferred relationships, control artifacts, concern scenarios, and process signals. Does not include runtime testing or adversarial validation.
 - **Assessment completeness:** COMPLETE
 - **Repository revision available:** true
-- **Repository commit:** `58ea8c2814ff3170a223bc270b082a0d1c2fe9fe`
+- **Repository commit:** `dd2bb0e7d502dc1345f1c443e7a75365107d2630`
 - **Repository branch:** `main`
 - **Repository dirty state:** False
 - **Scan exclusions:** none
@@ -165,29 +165,35 @@ Observed repository artifacts are separated from what an offline scan cannot ver
 
 ---
 
-## Top Remediations
+## Analyst Review Actions
 
-### P0 — User-influenced prompt path without detected input-handling control
+### User-influenced prompt path without detected input-handling control
 
-**Why it matters:** Repository evidence shows a prompt-construction path feeding a model call with no downstream tool/external/data sink detected. C03 Input Handling status: NOT_FOUND. This assessment does not confirm prompt injection is possible.
+**Evidence basis:** Repository evidence shows a prompt-construction path feeding a model call with no downstream tool/external/data sink detected. C03 Input Handling status: NOT_FOUND. This assessment does not confirm prompt injection is possible.
 
-**Suggested action:** Add schema validation or sanitization on the user-influenced prompt path.
+**Candidate action:** Add schema validation or sanitization on the user-influenced prompt path.
+
+**Requires analyst review:** Yes.
 
 *Traces to: risks `R-INPUT_SECURITY-d5857eaa`; controls `C03`.*
 
-### P1 — Model output without detected output-handling control
+### Model output without detected output-handling control
 
-**Why it matters:** Repository evidence shows model invocation with no downstream tool/external/data sink and no detected output-validation evidence. C04 Output Handling status: NOT_FOUND. This assessment does not confirm the output is used unsafely.
+**Evidence basis:** Repository evidence shows model invocation with no downstream tool/external/data sink and no detected output-validation evidence. C04 Output Handling status: NOT_FOUND. This assessment does not confirm the output is used unsafely.
 
-**Suggested action:** Add schema validation or sanitization on model output before it's used downstream.
+**Candidate action:** If model output is consumed by a structured, privileged, or externally visible downstream operation, evaluate output validation appropriate to that boundary.
+
+**Requires analyst review:** Yes.
 
 *Traces to: risks `R-OUTPUT_SECURITY-28a154ab`; controls `C04`.*
 
-### P2 — Address the next process-evidence gap
+### Address the next process-evidence gap
 
-**Why it matters:** no repeatable AI/security test artifact detected (e.g. tests/security/, tests/redteam/, evals/)
+**Evidence basis:** no repeatable AI/security test artifact detected (e.g. tests/security/, tests/redteam/, evals/)
 
-**Suggested action:** Add reviewable evidence for the listed process check.
+**Candidate action:** Add reviewable evidence for the listed process check.
+
+**Requires analyst review:** Yes.
 
 ---
 

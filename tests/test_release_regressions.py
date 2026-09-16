@@ -115,7 +115,9 @@ class TestReleaseOutputAndProvenance(unittest.TestCase):
         self.assertNotRegex(golden, r"(?m)^### P[012]\b")
         self.assertIn("If model output is consumed", golden)
         self.assertNotIn("**Score:**", golden)
-        self.assertIn("## Assessment Provenance", golden)
+        self.assertIn("**Repository revision available:** true", golden)
+        self.assertIn("**Repository commit:**", golden)
+        self.assertIn("**Repository dirty state:** False", golden)
         self.assertIn("## Limitations", golden)
 
     def test_manifest_is_derived_and_complete(self):
