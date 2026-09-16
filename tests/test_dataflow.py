@@ -1,4 +1,5 @@
 import unittest
+import tempfile
 from pathlib import Path
 
 from vibe_explainer.ai_discovery import discover_ai
@@ -92,6 +93,23 @@ class TestModelToExternalAPI(unittest.TestCase):
 
 
 class TestUnrelatedAndDistant(unittest.TestCase):
+    def test_nearby_unrelated_calls_are_unresolved_not_edges(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source = Path(tmp) / "app.py"
+            source.write_text(
+                "from openai import OpenAI\n"
+                "client = OpenAI()\n"
+                "def ask():\n"
+                "    SYSTEM_PROMPT = 'not used'\n"
+                "    return client.chat.completions.create(model='gpt-4o', messages=[])\n",
+                encoding="utf-8",
+            )
+            graph = build_dataflow(discover_ai(tmp))
+            self.assertEqual(_edges(graph, "feeds_prompt"), [])
+            candidates = [r for r in graph.unresolved if r["relationship"] == "feeds_prompt"]
+            self.assertTrue(candidates)
+            self.assertEqual(candidates[0]["reason"], "NO_SHARED_VALUE_OR_SYMBOL")
+
     def test_distant_same_file_findings_do_not_connect(self):
         discovery = discover_ai(FIXTURES / "dataflow-unrelated")
         graph = build_dataflow(discovery)
@@ -122,8 +140,8 @@ class TestUnrelatedAndDistant(unittest.TestCase):
             )
 
 
-class TestCrossFileDeferred(unittest.TestCase):
-    def test_cross_file_prompt_and_model_do_not_connect(self):
+class TestCrossFileResolution(unittest.TestCase):
+    def test_direct_imported_prompt_connects_by_symbol(self):
         discovery = discover_ai(FIXTURES / "dataflow-cross-file")
         # sanity: both findings exist, in different files
         prompt_findings = [f for f in discovery.findings if f.category == "prompt_surface"]
@@ -133,7 +151,30 @@ class TestCrossFileDeferred(unittest.TestCase):
         self.assertNotEqual(prompt_findings[0].file, usage_findings[0].file)
 
         graph = build_dataflow(discovery)
-        self.assertEqual(_edges(graph, "feeds_prompt"), [])
+        edges = _edges(graph, "feeds_prompt")
+        self.assertEqual(len(edges), 1)
+        self.assertEqual(edges[0].resolution_method, "PYTHON_IMPORT_SYMBOL")
+        self.assertIn("SYSTEM_PROMPT", edges[0].evidence)
+
+    def test_simple_reexport_resolves_to_origin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "__init__.py").write_text("", encoding="utf-8")
+            (root / "prompts.py").write_text("SYSTEM_PROMPT = 'safe'\n", encoding="utf-8")
+            (root / "exports.py").write_text(
+                "from .prompts import SYSTEM_PROMPT\n", encoding="utf-8"
+            )
+            (root / "model.py").write_text(
+                "from openai import OpenAI\nfrom .exports import SYSTEM_PROMPT\n"
+                "client = OpenAI()\ndef ask():\n"
+                "    return client.chat.completions.create(model='gpt-4o', messages=[SYSTEM_PROMPT])\n",
+                encoding="utf-8",
+            )
+            graph = build_dataflow(discover_ai(root))
+            edges = _edges(graph, "feeds_prompt")
+            self.assertEqual(len(edges), 1)
+            self.assertEqual(edges[0].source_file, "prompts.py")
+            self.assertEqual(edges[0].resolution_method, "PYTHON_IMPORT_SYMBOL")
 
 
 class TestCommentsDoNotCreateFlows(unittest.TestCase):

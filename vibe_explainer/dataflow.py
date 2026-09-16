@@ -1,20 +1,19 @@
-"""Static AI data-flow observation.
+"""Bounded static relationships between discovered AI findings.
 
-Connects AIFinding objects already produced by ai_discovery.py into a graph of
-plausible relationships, using conservative same-file line-proximity heuristics.
+Emitted edges require Python AST def-use, a consumed direct-import symbol, or a
+direct imported-call argument. Category-compatible candidates lacking structural
+evidence are retained with explicit unresolved reasons.
 
 WHAT THIS IS NOT:
-- Not program analysis. No AST parsing, no control-flow graph, no import
-  resolution, no taint tracking, no execution.
-- Not proof. An edge means "these two pieces of evidence sit near each other
-  in the same file and their categories match a documented rule" — nothing
-  more. It does not mean data actually flows between them at runtime.
+- Not runtime proof, a control-flow graph, or general taint tracking.
+- Not support for dynamic dispatch, reflection, framework injection, or arbitrary
+  interprocedural flow.
 
 STATUS VOCABULARY
 This module works with three statuses, but in practice only ever emits one:
 
-  INFERRED - a same-file, category-paired, proximity-supported relationship.
-             This is the *only* status this module produces.
+  STRUCTURALLY_INFERRED - a bounded AST def-use/import-supported relationship.
+                          This is the only status emitted for edges.
   OBSERVED - reserved for a stronger evidentiary standard (e.g. execution
              tracing, instrumented runs) that this static-analysis phase does
              not implement. Never emitted here — emitting it would misrepresent
@@ -52,10 +51,12 @@ NOT implemented this phase (documented, not silently skipped):
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
-from .ai_discovery import AIFinding, DiscoveryResult
+from .ai_discovery import AIFinding, DiscoveryResult, _read_text
 from .security_utils import redact_secrets
 
 # Proximity threshold: two findings farther apart than this (same file) are not
@@ -68,7 +69,7 @@ MAX_DATAFLOW_LINE_DISTANCE = 30
 # Beyond this and up to MAX_DATAFLOW_LINE_DISTANCE, confidence is "moderate".
 HIGH_CONFIDENCE_LINE_DISTANCE = 10
 
-STATUS_INFERRED = "INFERRED"
+STATUS_INFERRED = "STRUCTURALLY_INFERRED"
 STATUS_OBSERVED = "OBSERVED"  # reserved, unused this phase — see module docstring
 STATUS_UNKNOWN = "UNKNOWN"  # reserved, unused this phase — see module docstring
 
@@ -119,7 +120,7 @@ class DataFlowObservation:
     confidence: str
     evidence: str
     status: str = STATUS_INFERRED
-    resolution_method: str = "SAME_FILE"  # Phase 8G: SAME_FILE | IMPORT
+    resolution_method: str = "PYTHON_DEF_USE"
     source_file: str = ""  # populated for cross-file edges
     destination_file: str = ""
 
@@ -155,6 +156,7 @@ class DataFlowGraph:
     nodes: list[str] = field(default_factory=list)  # all discovery finding ids
     edges: list[DataFlowObservation] = field(default_factory=list)
     truncated: list[dict[str, Any]] = field(default_factory=list)  # pass-through, not lost
+    unresolved: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -162,9 +164,11 @@ class DataFlowGraph:
             "nodes": list(self.nodes),
             "edges": [e.to_dict() for e in self.edges],
             "truncated": list(self.truncated),
+            "unresolved": list(self.unresolved),
             "summary": {
                 "node_count": len(self.nodes),
                 "edge_count": len(self.edges),
+                "unresolved_count": len(self.unresolved),
             },
         }
 
@@ -179,7 +183,7 @@ def _edge_sort_key(edge: DataFlowObservation) -> tuple:
     )
 
 
-def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
+def _build_proximity_dataflow_legacy(discovery: DiscoveryResult) -> DataFlowGraph:
     """Build a static data-flow graph from a DiscoveryResult.
 
     Deterministic: given the same set of findings, produces the same nodes,
@@ -305,4 +309,269 @@ def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
 
     edges.sort(key=_edge_sort_key)
     graph.edges = edges
+    return graph
+
+
+@dataclass
+class _PythonFacts:
+    tree: ast.AST
+    statements: list[ast.stmt]
+    functions: list[ast.AST]
+    definitions: dict[ast.AST, list[tuple[int, set[str], set[str]]]]
+
+
+def _node_span(node: ast.AST) -> tuple[int, int]:
+    return getattr(node, "lineno", 1), getattr(node, "end_lineno", getattr(node, "lineno", 1))
+
+
+def _scope_for(facts: _PythonFacts, line: int) -> ast.AST:
+    scopes = [n for n in facts.functions if _node_span(n)[0] <= line <= _node_span(n)[1]]
+    return min(scopes, key=lambda n: _node_span(n)[1] - _node_span(n)[0]) if scopes else facts.tree
+
+
+def _statement_for(facts: _PythonFacts, line: int) -> ast.stmt | None:
+    nodes = [n for n in facts.statements if _node_span(n)[0] <= line <= _node_span(n)[1]]
+    return min(nodes, key=lambda n: _node_span(n)[1] - _node_span(n)[0]) if nodes else None
+
+
+def _stored_names(node: ast.AST) -> set[str]:
+    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+
+
+def _loaded_names(node: ast.AST) -> set[str]:
+    return {n.id for n in ast.walk(node) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)}
+
+
+def _call_inputs(statement: ast.stmt | None) -> set[str]:
+    if statement is None:
+        return set()
+    result: set[str] = set()
+    for call in (n for n in ast.walk(statement) if isinstance(n, ast.Call)):
+        for value in [*call.args, *(kw.value for kw in call.keywords)]:
+            result.update(_loaded_names(value))
+    return result
+
+
+def _parse_python_facts(root: Path, files: set[str]) -> dict[str, _PythonFacts]:
+    parsed: dict[str, _PythonFacts] = {}
+    for rel in sorted(files):
+        if Path(rel).suffix.lower() != ".py":
+            continue
+        text = _read_text(root / rel)
+        if text is None:
+            continue
+        try:
+            tree = ast.parse(text)
+        except (SyntaxError, ValueError):
+            continue
+        statements = [n for n in ast.walk(tree) if isinstance(n, ast.stmt)]
+        functions = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))]
+        facts = _PythonFacts(tree, statements, functions, {})
+        for scope in [tree, *functions]:
+            rows: list[tuple[int, set[str], set[str]]] = []
+            for statement in statements:
+                if _scope_for(facts, _node_span(statement)[0]) is not scope:
+                    continue
+                targets = _stored_names(statement)
+                if targets:
+                    rows.append((_node_span(statement)[0], targets, _loaded_names(statement) - targets))
+            facts.definitions[scope] = sorted(rows, key=lambda row: row[0])
+        parsed[rel] = facts
+    return parsed
+
+
+def _dependency_closure(facts: _PythonFacts, scope: ast.AST, names: set[str], before_line: int) -> set[str]:
+    closure = set(names)
+    changed = True
+    while changed:
+        changed = False
+        for line, targets, dependencies in facts.definitions.get(scope, []):
+            if line > before_line or not (targets & closure):
+                continue
+            additions = dependencies - closure
+            if additions:
+                closure.update(additions)
+                changed = True
+    return closure
+
+
+def _same_file_basis(facts: _PythonFacts, source: AIFinding, dest: AIFinding) -> tuple[bool, set[str], str]:
+    source_scope = _scope_for(facts, source.line)
+    dest_scope = _scope_for(facts, dest.line)
+    if source_scope is not dest_scope and source_scope is not facts.tree:
+        return False, set(), "DIFFERENT_FUNCTION_SCOPE"
+    source_statement = _statement_for(facts, source.line)
+    dest_statement = _statement_for(facts, dest.line)
+    if source_statement is None or dest_statement is None:
+        return False, set(), "NO_ENCLOSING_STATEMENT"
+    if source_statement is dest_statement:
+        return True, {"same-call"}, "SAME_CALL_CONFIGURATION"
+    if source.line > dest.line:
+        return False, set(), "NON_DIRECTIONAL_ORDER"
+    outputs = _stored_names(source_statement)
+    if not outputs:
+        return False, set(), "SOURCE_VALUE_NOT_BOUND"
+    inputs = _call_inputs(dest_statement)
+    dependencies = _dependency_closure(facts, dest_scope, inputs, dest.line)
+    shared = outputs & dependencies
+    return (bool(shared), shared, "SHARED_DEF_USE" if shared else "NO_SHARED_VALUE_OR_SYMBOL")
+
+
+def _import_symbol_map(discovery: DiscoveryResult, facts_by_file: dict[str, _PythonFacts]) -> dict[str, dict[str, tuple[str, str]]]:
+    result: dict[str, dict[str, tuple[str, str]]] = {}
+    imports_by_file = getattr(discovery, "imports_by_file", {}) or {}
+    for importer, imported_files in imports_by_file.items():
+        facts = facts_by_file.get(importer)
+        if not facts:
+            continue
+        for node in ast.walk(facts.tree):
+            if not isinstance(node, ast.ImportFrom):
+                continue
+            candidates = [f for f in imported_files if Path(f).stem == (node.module or "").split(".")[-1]]
+            if len(candidates) != 1:
+                continue
+            for alias in node.names:
+                local_name = alias.asname or alias.name
+                result.setdefault(importer, {})[local_name] = (candidates[0], alias.name)
+    # Collapse simple ``from x import y`` re-export chains to their defining file.
+    for _ in range(len(result) + 1):
+        changed = False
+        for importer, symbols in result.items():
+            for local_name, (target_file, target_name) in list(symbols.items()):
+                origin = result.get(target_file, {}).get(target_name)
+                if origin and origin != (target_file, target_name):
+                    symbols[local_name] = origin
+                    changed = True
+        if not changed:
+            break
+    return result
+
+
+def _imported_call_basis(
+    source: AIFinding,
+    dest: AIFinding,
+    facts_by_file: dict[str, _PythonFacts],
+    import_symbols: dict[str, dict[str, tuple[str, str]]],
+) -> set[str]:
+    source_facts = facts_by_file.get(source.file)
+    dest_facts = facts_by_file.get(dest.file)
+    if not source_facts or not dest_facts:
+        return set()
+    source_statement = _statement_for(source_facts, source.line)
+    outputs = _stored_names(source_statement) if source_statement else set()
+    if not outputs:
+        return set()
+    dest_scope = _scope_for(dest_facts, dest.line)
+    dest_name = getattr(dest_scope, "name", None)
+    if not dest_name:
+        return set()
+    scope = _scope_for(source_facts, source.line)
+    for statement in source_facts.statements:
+        line = _node_span(statement)[0]
+        if line < source.line or _scope_for(source_facts, line) is not scope:
+            continue
+        for call in (n for n in ast.walk(statement) if isinstance(n, ast.Call)):
+            if not isinstance(call.func, ast.Name):
+                continue
+            imported = import_symbols.get(source.file, {}).get(call.func.id)
+            if imported != (dest.file, dest_name):
+                continue
+            inputs = set()
+            for value in [*call.args, *(kw.value for kw in call.keywords)]:
+                inputs.update(_loaded_names(value))
+            dependencies = _dependency_closure(source_facts, scope, inputs, line)
+            shared = outputs & dependencies
+            if shared:
+                return shared
+    return set()
+
+
+def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
+    """Build bounded Python def-use relationships; retain ambiguity explicitly."""
+    graph = DataFlowGraph(root=discovery.root)
+    graph.nodes = sorted({f.id for f in discovery.findings})
+    graph.truncated = [t.to_dict() for t in discovery.truncated]
+    files = {f.file for f in discovery.findings}
+    for importer, imported in (getattr(discovery, "imports_by_file", {}) or {}).items():
+        files.add(importer)
+        files.update(imported)
+    facts_by_file = _parse_python_facts(Path(discovery.root), files)
+    import_symbols = _import_symbol_map(discovery, facts_by_file)
+    seen: set[tuple[str, str, str]] = set()
+
+    for source_cat, dest_cat in _RULE_PAIRS:
+        sources = [f for f in discovery.findings if f.category == source_cat]
+        destinations = [f for f in discovery.findings if f.category == dest_cat]
+        for source in sources:
+            for dest in destinations:
+                basis: set[str] = set()
+                reason = "UNSUPPORTED_LANGUAGE_OR_PARSE"
+                method = "PYTHON_DEF_USE"
+                established = False
+                if source.file == dest.file and source.file in facts_by_file:
+                    established, basis, reason = _same_file_basis(facts_by_file[source.file], source, dest)
+                elif source.file != dest.file and dest.file in facts_by_file:
+                    dest_facts = facts_by_file[dest.file]
+                    dest_statement = _statement_for(dest_facts, dest.line)
+                    dest_scope = _scope_for(dest_facts, dest.line)
+                    inputs = _dependency_closure(dest_facts, dest_scope, _call_inputs(dest_statement), dest.line)
+                    imported = import_symbols.get(dest.file, {})
+                    shared = {
+                        local for local in inputs
+                        if local in imported and imported[local][0] == source.file
+                    }
+                    source_statement = _statement_for(facts_by_file.get(source.file), source.line) if source.file in facts_by_file else None
+                    source_outputs = _stored_names(source_statement) if source_statement else set()
+                    matched = {local for local in shared if imported[local][1] in source_outputs}
+                    established = bool(matched)
+                    basis = matched
+                    reason = "IMPORTED_SYMBOL_DEF_USE" if matched else "NO_SHARED_IMPORTED_SYMBOL"
+                    method = "PYTHON_IMPORT_SYMBOL"
+                    if not established:
+                        called = _imported_call_basis(
+                            source, dest, facts_by_file, import_symbols
+                        )
+                        if called:
+                            established = True
+                            basis = called
+                            reason = "IMPORTED_CALL_ARGUMENT_DEF_USE"
+                            method = "PYTHON_IMPORT_CALL"
+                else:
+                    continue
+
+                relationship = _relationship_name(source, dest)
+                if not established:
+                    graph.unresolved.append({
+                        "source_finding_id": source.id,
+                        "destination_finding_id": dest.id,
+                        "relationship": relationship,
+                        "reason": reason,
+                    })
+                    continue
+                edge_key = (source.id, dest.id, relationship)
+                if edge_key in seen:
+                    continue
+                seen.add(edge_key)
+                basis_text = ", ".join(sorted(basis))
+                graph.edges.append(DataFlowObservation(
+                    source_finding_id=source.id,
+                    destination_finding_id=dest.id,
+                    source_type=source.category,
+                    destination_type=dest.category,
+                    relationship=relationship,
+                    file=dest.file,
+                    source_line=source.line,
+                    destination_line=dest.line,
+                    confidence="high" if method == "PYTHON_DEF_USE" else "moderate",
+                    evidence=f"Bounded structural relationship via {reason}: {basis_text}.",
+                    status=STATUS_INFERRED,
+                    resolution_method=method,
+                    source_file=source.file,
+                    destination_file=dest.file,
+                ))
+
+    graph.edges.sort(key=_edge_sort_key)
+    graph.unresolved.sort(key=lambda row: (
+        row["relationship"], row["source_finding_id"], row["destination_finding_id"]
+    ))
     return graph

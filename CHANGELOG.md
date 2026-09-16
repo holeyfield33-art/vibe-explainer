@@ -7,6 +7,10 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Replace nearest-line data-flow edges with bounded Python AST def-use, direct imported
+  symbol, and direct imported-call relationships. Proximity-only candidates are retained
+  with explicit unresolved reasons and cannot drive concern scenarios.
+
 - Add PEP 621 packaging and an installed `vibe-explainer` console command for Python
   3.11–3.14; define a single version source and release/schema compatibility policy.
 - Publish report schema 2.0 for occurrence-based evidence identity and the revised

@@ -110,9 +110,17 @@ class TestDataFlows(unittest.TestCase):
         self.assertGreater(len(report.data_flows), 0)
         self.assertTrue(all("relationship" in e for e in report.data_flows))
 
-    def test_no_cross_file_flow_implied(self):
+    def test_direct_import_symbol_flow_is_reported(self):
         report = _report("dataflow-cross-file")
-        self.assertEqual(report.data_flows, [])
+        self.assertEqual(len(report.data_flows), 1)
+        self.assertEqual(report.data_flows[0]["resolution_method"], "PYTHON_IMPORT_SYMBOL")
+
+    def test_unresolved_candidates_are_separate_from_edges(self):
+        report = _report("agent-with-tools")
+        self.assertTrue(report.unresolved_relationships)
+        serialized = report.to_dict()
+        self.assertIn("unresolved_relationships", serialized)
+        self.assertTrue(all("reason" in row for row in serialized["unresolved_relationships"]))
 
 
 class TestControls(unittest.TestCase):

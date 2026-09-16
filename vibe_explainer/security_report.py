@@ -76,6 +76,7 @@ class VibeExplainerReport:
     ai_inventory: dict[str, Any]
     attack_surface: dict[str, Any]
     data_flows: list[dict[str, Any]]
+    unresolved_relationships: list[dict[str, Any]]
     controls: dict[str, Any]
     risks: dict[str, Any]
     readiness: dict[str, Any]
@@ -89,6 +90,7 @@ class VibeExplainerReport:
             "ai_inventory": self.ai_inventory,
             "attack_surface": self.attack_surface,
             "data_flows": self.data_flows,
+            "unresolved_relationships": self.unresolved_relationships,
             "controls": self.controls,
             "risks": self.risks,
             "readiness": self.readiness,
@@ -243,7 +245,7 @@ def build_report(
             "file": e.file,
             "source_line": e.source_line,
             "destination_line": e.destination_line,
-            "resolution_method": getattr(e, "resolution_method", "SAME_FILE"),
+            "resolution_method": getattr(e, "resolution_method", "PYTHON_DEF_USE"),
             "source_file": getattr(e, "source_file", "") or e.file,
             "destination_file": getattr(e, "destination_file", "") or e.file,
             "evidence": _redact_check(e.evidence),
@@ -478,6 +480,7 @@ def build_report(
         ai_inventory=ai_inventory,
         attack_surface=attack_surface_out,
         data_flows=data_flows_out,
+        unresolved_relationships=list(dataflow.unresolved),
         controls=controls_out,
         risks=risks_out,
         readiness=readiness_out,

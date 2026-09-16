@@ -224,7 +224,7 @@ class TestCrossFileDataFlow(unittest.TestCase):
             "services/ai.py": "from openai import OpenAI\nc = OpenAI()\n"
                               "def generate(p):\n    return c.chat.completions.create(model='gpt-4o', messages=[{'role':'user','content':p}])\n",
         })
-        xf = [e for e in g.edges if e.resolution_method == "IMPORT"]
+        xf = [e for e in g.edges if e.resolution_method == "PYTHON_IMPORT_CALL"]
         self.assertTrue(xf)
         e = xf[0]
         self.assertEqual(e.source_file, "routes.py")
@@ -254,7 +254,10 @@ class TestCrossFileDataFlow(unittest.TestCase):
             "lib/model.py": "from openai import OpenAI\nc=OpenAI()\ndef run(p):\n    return c.chat.completions.create(model='g', messages=[{'role':'user','content':p}])\n",
         })
         for e in g.edges:
-            self.assertIn(e.resolution_method, ("SAME_FILE", "IMPORT"))
+            self.assertIn(
+                e.resolution_method,
+                ("PYTHON_DEF_USE", "PYTHON_IMPORT_SYMBOL", "PYTHON_IMPORT_CALL"),
+            )
             d = e.to_dict()
             self.assertIn("resolution_method", d)
             self.assertIn("source_file", d)

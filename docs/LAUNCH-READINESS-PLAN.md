@@ -46,7 +46,7 @@ the launch gates at the end of this document pass.
   Verify: labelled corpus metrics meet at least 90% precision for high-confidence Python
   findings, with recall and unresolved rates published.
 
-- [ ] **5. Replace proximity with bounded structural relationships**
+- [x] **5. Replace proximity with bounded structural relationships**
   Issue refs: `#5`
   What to build: Add Python intra-procedural def-use and direct local import/re-export
   resolution. Rename legacy edges to proximity associations and prevent them from driving

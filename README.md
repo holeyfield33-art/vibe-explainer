@@ -7,7 +7,8 @@ output for analyst validation.
 
 It is a pre-release evidence tool. It is not a vulnerability scanner, penetration test,
 compliance assessment, certification, or proof that a control is effective. Current
-discovery is primarily regex-based, and relationships include proximity/import heuristics.
+discovery is primarily regex-based, while Python relationships require bounded AST
+def-use or direct-import evidence.
 Default reports intentionally contain no numeric concern severity or awarded maturity
 level.
 
@@ -87,9 +88,10 @@ AI idioms. Other listed extensions receive lexical scanning with uneven coverage
 Current limitations:
 
 - General discovery is not yet syntax-aware across supported languages.
-- Same-file relationships may be line-proximity associations rather than def-use flow.
+- Structural relationships remain bounded static inference, not runtime flow proof.
 - Import-resolved cross-file relationships show reachability, not proven data flow.
-- Control evidence is mainly keyword, path, header, and proximity based.
+- Control discovery begins with named patterns; Python enforcement relationships use
+  same-function AST checks but remain incomplete for dynamic/framework wiring.
 - Runtime reachability, exploitability, control enforcement, external security processes,
   and deployed configuration are not verified.
 - Precision and recall have not yet been established on an independently labelled corpus.

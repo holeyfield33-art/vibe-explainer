@@ -152,17 +152,15 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("## Inferred Relationships")
     add("")
     if report.data_flows:
-        add("Static relationship observations between AI-related components. These are inferences "
-            "from code proximity (same-file) and resolved imports (cross-file) — not "
-            "confirmed runtime data flows. The Method column records how each edge was "
-            "resolved; cross-file (IMPORT) edges are bounded inference from import "
-            "resolution, never proven flow.")
+        add("Bounded structural relationships between AI-related components. Python edges require "
+            "shared def-use, imported-symbol use, or an imported call argument; they remain "
+            "static inferences, not confirmed runtime flows.")
         add("")
         add("| Source | Relationship | Destination | Method | Confidence | Location |")
         add("|---|---|---|---|---|---|")
         for e in report.data_flows:
-            method = e.get("resolution_method", "SAME_FILE")
-            if method == "IMPORT":
+            method = e.get("resolution_method", "PYTHON_DEF_USE")
+            if method in {"PYTHON_IMPORT_SYMBOL", "PYTHON_IMPORT_CALL"}:
                 loc = f"`{e.get('source_file', e['file'])}` → `{e.get('destination_file', e['file'])}`"
             else:
                 loc = f"`{e['file']}:{e['source_line']}→{e['destination_line']}`"
@@ -171,6 +169,17 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         add("")
     else:
         add("No supported static relationships were observed.")
+        add("")
+    if report.unresolved_relationships:
+        add("### Unresolved relationship candidates")
+        add("")
+        add("These candidates are retained for analyst review and do not drive concern scenarios.")
+        add("")
+        add("| Relationship | Reason | Source finding | Destination finding |")
+        add("|---|---|---|---|")
+        for row in report.unresolved_relationships:
+            add(f"| `{row['relationship']}` | {row['reason']} | `{row['source_finding_id']}` | "
+                f"`{row['destination_finding_id']}` |")
         add("")
     add("---")
     add("")

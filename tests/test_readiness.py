@@ -184,13 +184,12 @@ class TestContinuousLevel(unittest.TestCase):
         self.assertTrue(any("scheduled" in m for m in l4.missing_requirements))
 
 
-class TestHighRiskImmature(unittest.TestCase):
-    def test_high_risk_scenario_does_not_force_low_readiness_report(self):
-        # agent-with-tools has a HIGH severity risk scenario but no process evidence
+class TestUnresolvedRiskImmature(unittest.TestCase):
+    def test_unresolved_proximity_does_not_drive_high_risk_or_readiness(self):
         discovery, surface, graph, controls, risks, readiness = _full_assess("agent-with-tools")
         severities = {s.severity for s in risks.scenarios}
-        self.assertIn("HIGH", severities)
-        self.assertEqual(readiness.readiness_level, 1)  # still just Level 1, same as any other immature repo
+        self.assertNotIn("HIGH", severities)
+        self.assertEqual(readiness.readiness_level, 1)
 
 
 class TestLowRiskImmature(unittest.TestCase):

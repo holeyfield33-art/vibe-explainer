@@ -103,12 +103,8 @@ class TestAuthorizedVsUnauthorizedTool(unittest.TestCase):
         self.assertGreater(unauth.security_exposure, auth.security_exposure)
         self.assertGreaterEqual(unauth.score, auth.score)
 
-    def test_unauthorized_high_impact_scores_higher_than_authorized(self):
-        unauth = _by_category(_assess("agent-with-tools"), "HIGH_IMPACT_ACTION")[0]
-        auth = _by_category(_assess("controls-tool-with-auth"), "HIGH_IMPACT_ACTION")[0]
-        self.assertGreater(unauth.score, auth.score)
-        self.assertEqual(unauth.severity, SEVERITY_HIGH)
-        self.assertEqual(auth.severity, SEVERITY_LOW)
+    def test_unrelated_model_and_shell_calls_do_not_create_high_impact_scenario(self):
+        self.assertEqual(_by_category(_assess("agent-with-tools"), "HIGH_IMPACT_ACTION"), [])
 
     def test_authorized_tool_scenario_rationale_recognizes_control(self):
         auth = _by_category(_assess("controls-tool-with-auth"), "TOOL_SECURITY")[0]
