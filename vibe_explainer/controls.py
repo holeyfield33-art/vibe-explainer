@@ -383,7 +383,7 @@ def _real(findings: list[AIFinding]) -> list[AIFinding]:
     context, or a bare keyword-only signal) — real, but not trustworthy enough
     on its own to say the surface exists. Callers that need the un-filtered
     list (e.g. to explain an N/A verdict) should keep a reference to it."""
-    return [f for f in findings if f.confidence != "low"]
+    return [f for f in findings if f.confidence != "low" and f.supports_conclusions]
 
 
 def _surface_absent_reason(raw: list[AIFinding], nothing_found_reason: str, surface_description: str) -> str:
@@ -393,9 +393,11 @@ def _surface_absent_reason(raw: list[AIFinding], nothing_found_reason: str, surf
     here" apart from "something here, but we don't trust it", rather than
     both reading as an identical N/A."""
     if raw and not _real(raw):
+        unsupported = any(not f.supports_conclusions for f in raw)
+        qualifier = "unsupported lexical-lead or low-confidence" if unsupported else "low-confidence"
         return (
             f"{surface_description} evidence was found in this repository, but it was "
-            f"low-confidence only (e.g. a dangerous-call token appearing in a comment or "
+            f"{qualifier} only (e.g. a dangerous-call token appearing in a comment or "
             f"string literal, not a live call) — not treated as establishing a real surface "
             f"for this control."
         )
@@ -451,7 +453,10 @@ def assess_controls(
     doc_evidence = _scan_doc_evidence(root_path)
     structures = _python_structures(root_path)
 
-    findings = discovery.findings
+    findings = discovery.conclusion_findings()
+    raw_by_category: dict[str, list[AIFinding]] = {}
+    for f in discovery.findings:
+        raw_by_category.setdefault(f.category, []).append(f)
     by_category: dict[str, list[AIFinding]] = {}
     for f in findings:
         by_category.setdefault(f.category, []).append(f)
@@ -470,8 +475,10 @@ def assess_controls(
     # literal — see _match_in_string_or_comment). It still belongs in the
     # evidence appendix and attack-surface table, but must not, by itself,
     # be enough to flip a control from N/A to NOT_DETECTED/PARTIAL/DETECTED.
-    tool_like_raw = tool_agent + mcp
-    high_risk_tools_raw = [f for f in tool_agent if f.name in HIGH_RISK_TOOL_NAMES]
+    tool_like_raw = raw_by_category.get("tool_agent", []) + raw_by_category.get("mcp", [])
+    high_risk_tools_raw = [
+        f for f in raw_by_category.get("tool_agent", []) if f.name in HIGH_RISK_TOOL_NAMES
+    ]
 
     tool_like = _real(tool_like_raw)
     high_risk_tools = _real(high_risk_tools_raw)
@@ -572,7 +579,7 @@ def assess_controls(
 
     # ---- C01 — AI INVENTORY -------------------------------------------
     if not discovery.has_ai_signal():
-        controls.append(not_applicable("C01", "AI Inventory", "AI_INVENTORY", "No AI components were discovered in this repository — there is nothing to inventory."))
+        controls.append(not_applicable("C01", "AI Inventory", "AI_INVENTORY", "No supported AI evidence was established in analyzed constructs — there is no authoritative inventory surface."))
     else:
         matches = doc_evidence.get("C01", [])
         if matches:
@@ -595,7 +602,7 @@ def assess_controls(
 
     # ---- C02 — AI THREAT MODEL -----------------------------------------
     if not discovery.has_ai_signal():
-        controls.append(not_applicable("C02", "AI Threat Model", "THREAT_MODELING", "No AI components were discovered in this repository — there is no AI surface to threat-model."))
+        controls.append(not_applicable("C02", "AI Threat Model", "THREAT_MODELING", "No supported AI evidence was established in analyzed constructs — there is no authoritative AI surface to threat-model."))
     else:
         matches = doc_evidence.get("C02", [])
         if matches:

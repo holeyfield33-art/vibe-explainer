@@ -4,6 +4,7 @@ from pathlib import Path
 from vibe_explainer.ai_discovery import discover_ai
 from vibe_explainer.attack_surface import build_attack_surface
 from vibe_explainer.controls import (
+    ENFORCEMENT_NOT_APPLICABLE,
     ENFORCEMENT_NOT_ESTABLISHED,
     ENFORCEMENT_PARTIAL,
     EFFECTIVENESS_UNVERIFIED,
@@ -280,8 +281,8 @@ class TestCustomEnvSecretDetection(unittest.TestCase):
     def test_custom_named_env_secret_detected(self):
         assessment = _assess("controls-custom-env-secret")
         c08 = _control(assessment, "C08")
-        self.assertEqual(c08.status, STATUS_PARTIAL)
-        self.assertEqual(c08.enforcement_status, ENFORCEMENT_NOT_ESTABLISHED)
+        self.assertEqual(c08.status, STATUS_NOT_APPLICABLE)
+        self.assertEqual(c08.enforcement_status, ENFORCEMENT_NOT_APPLICABLE)
 
     def test_custom_named_env_secret_traceable_to_finding(self):
         discovery = discover_ai(FIXTURES / "controls-custom-env-secret")

@@ -50,7 +50,7 @@ EVIDENCE_RISK = "RISK_EVIDENCE"
 EVIDENCE_PROCESS = "PROCESS_EVIDENCE"
 
 LEVEL_NAMES = {1: "Baseline", 2: "Managed", 3: "Hardened", 4: "Continuous"}
-NO_AI_SURFACE = "NO_AI_SURFACE"
+NO_AI_SURFACE = "NO_SUPPORTED_AI_EVIDENCE"
 
 
 # ---------------------------------------------------------------------------
@@ -452,7 +452,10 @@ def assess_readiness(
             readiness_level=None,
             readiness_name=NO_AI_SURFACE,
             confidence="high",
-            rationale="No AI components were discovered in this repository — no AI security readiness level applies.",
+            rationale=(
+                "No supported AI evidence was established in analyzed constructs; "
+                "unsupported-language lexical leads and coverage limitations do not prove absence."
+            ),
             evidence=[],
             level_assessments=[],
             blockers=[],
@@ -483,7 +486,7 @@ def assess_readiness(
     # evidence below is DISCOVERY_EVIDENCE (what the scan found), never
     # treated as proof of a maintained program.
     l1_evidence = [
-        _evidence(EVIDENCE_DISCOVERY, "discovery", f"{len(discovery.findings)} AI component finding(s) identified."),
+        _evidence(EVIDENCE_DISCOVERY, "discovery", f"{len(discovery.conclusion_findings())} supported AI evidence finding(s) identified."),
         _evidence(EVIDENCE_DISCOVERY, "attack_surface", f"Attack surface mapped across {sum(1 for b in attack_surface.by_bucket().values() if b)} non-empty bucket(s)."),
         _evidence(EVIDENCE_DATAFLOW, "dataflow", f"{len(dataflow.edges)} data-flow relationship(s) observed."),
     ]

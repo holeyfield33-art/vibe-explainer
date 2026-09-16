@@ -281,7 +281,7 @@ def assess_risks(
         completeness = COMPLETENESS_COMPLETE
 
     if not discovery.has_ai_signal():
-        no_signal_note = "No AI components were discovered in this repository — no AI security risk scenarios were generated."
+        no_signal_note = "No supported AI evidence was established in analyzed constructs, so no AI security concern scenarios were generated."
         if completeness == COMPLETENESS_PARTIAL:
             no_signal_note += (
                 " This is a lower bound, not a clean bill of health: some in-scope files "
@@ -297,7 +297,7 @@ def assess_risks(
         )
 
     by_category: dict[str, list[AIFinding]] = {}
-    for f in discovery.findings:
+    for f in discovery.conclusion_findings():
         by_category.setdefault(f.category, []).append(f)
 
     ai_usage = by_category.get("ai_usage", [])

@@ -184,6 +184,8 @@ def _protocol_observations(report: Any) -> dict[str, list[dict[str, Any]]]:
 
     for category, items in categories.items():
         for item in items:
+            if not item.get("supports_conclusions", True):
+                continue
             if category in {"ai_usage", "tool_agent"}:
                 add("Native", category, item, "Native model/tool integration evidence observed.")
             if category == "mcp":

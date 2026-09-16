@@ -101,7 +101,7 @@ def _relationship_name(source: AIFinding, dest: AIFinding) -> str:
     raise ValueError(f"No relationship rule documented for pair {pair}")  # pragma: no cover
 
 
-def _confidence_for_distance(distance: int) -> str:
+def _confidence_for_distance(distance: int) -> str:  # pragma: no cover - legacy compatibility
     if distance <= HIGH_CONFIDENCE_LINE_DISTANCE:
         return "high"
     return "moderate"
@@ -183,7 +183,9 @@ def _edge_sort_key(edge: DataFlowObservation) -> tuple:
     )
 
 
-def _build_proximity_dataflow_legacy(discovery: DiscoveryResult) -> DataFlowGraph:
+def _build_proximity_dataflow_legacy(  # pragma: no cover - retained for pre-2.0 compatibility
+    discovery: DiscoveryResult,
+) -> DataFlowGraph:
     """Build a static data-flow graph from a DiscoveryResult.
 
     Deterministic: given the same set of findings, produces the same nodes,
@@ -489,9 +491,10 @@ def _imported_call_basis(
 def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
     """Build bounded Python def-use relationships; retain ambiguity explicitly."""
     graph = DataFlowGraph(root=discovery.root)
-    graph.nodes = sorted({f.id for f in discovery.findings})
+    eligible = discovery.conclusion_findings()
+    graph.nodes = sorted({f.id for f in eligible})
     graph.truncated = [t.to_dict() for t in discovery.truncated]
-    files = {f.file for f in discovery.findings}
+    files = {f.file for f in eligible}
     for importer, imported in (getattr(discovery, "imports_by_file", {}) or {}).items():
         files.add(importer)
         files.update(imported)
@@ -500,8 +503,8 @@ def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
     seen: set[tuple[str, str, str]] = set()
 
     for source_cat, dest_cat in _RULE_PAIRS:
-        sources = [f for f in discovery.findings if f.category == source_cat]
-        destinations = [f for f in discovery.findings if f.category == dest_cat]
+        sources = [f for f in eligible if f.category == source_cat]
+        destinations = [f for f in eligible if f.category == dest_cat]
         for source in sources:
             for dest in destinations:
                 basis: set[str] = set()

@@ -36,7 +36,7 @@ the launch gates at the end of this document pass.
   Verify: golden tests against the pinned 40-class ASI export and negative fixtures for
   Native, MCP, RAG, A2A, ANP, and Skills applicability.
 
-- [ ] **4. Build syntax-aware discovery**
+- [x] **4. Build syntax-aware discovery**
   Issue refs: `#4`
   What to build: Use Python AST/tokenize for imports, calls, assignments, aliases,
   comments, and strings. Keep unsupported-language lexical leads separate from

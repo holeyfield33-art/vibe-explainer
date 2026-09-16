@@ -13,11 +13,14 @@ has access to.
 
 from __future__ import annotations
 
+import ast
 import hashlib
+import io
 import os
 import re
 import stat
 import time
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -88,6 +91,8 @@ class AIFinding:
     context: str = "PRODUCTION"  # file context (Phase 8D): PRODUCTION/TEST/SECURITY_TEST/...
     context_confidence: str = "moderate"
     context_defaulted: bool = False
+    evidence_basis: str = "PYTHON_AST"
+    supports_conclusions: bool = True
 
     def __post_init__(self) -> None:
         if not self.id:
@@ -105,6 +110,8 @@ class AIFinding:
             "context": self.context,
             "context_confidence": self.context_confidence,
             "context_defaulted": self.context_defaulted,
+            "evidence_basis": self.evidence_basis,
+            "supports_conclusions": self.supports_conclusions,
         }
 
 
@@ -145,6 +152,11 @@ class DiscoveryResult:
     files_unreadable: int = 0
     budget_exhausted: bool = False
     budget_exhausted_reason: str | None = None
+    supported_languages: list[str] = field(default_factory=lambda: ["python", "structured_config"])
+    supported_constructs: list[str] = field(default_factory=lambda: [
+        "python imports", "python calls", "python assignments", "python decorators",
+        "JSON/YAML/TOML/env configuration artifacts",
+    ])
 
     def by_category(self) -> dict[str, list[AIFinding]]:
         out: dict[str, list[AIFinding]] = {}
@@ -153,7 +165,14 @@ class DiscoveryResult:
         return out
 
     def has_ai_signal(self) -> bool:
-        return len(self.findings) > 0
+        return bool(self.conclusion_findings())
+
+    def has_any_lead(self) -> bool:
+        return bool(self.findings)
+
+    def conclusion_findings(self) -> list[AIFinding]:
+        """Evidence eligible for risk, control, and readiness conclusions."""
+        return [f for f in self.findings if f.supports_conclusions]
 
     def has_coverage_gap(self) -> bool:
         return self.files_skipped_size > 0 or self.files_unreadable > 0 or self.budget_exhausted
@@ -165,6 +184,21 @@ class DiscoveryResult:
             "files_scanned": self.files_scanned,
             "has_ai_signal": self.has_ai_signal(),
             "findings": [f.to_dict() for f in self.findings],
+            "analysis_coverage": {
+                "supported_languages": self.supported_languages,
+                "supported_constructs": self.supported_constructs,
+                "authoritative_findings": len(self.conclusion_findings()),
+                "unsupported_lexical_leads": sum(
+                    1 for f in self.findings if f.evidence_basis == "LEXICAL_LEAD"
+                ),
+                "unresolved_findings": sum(
+                    1 for f in self.findings if f.evidence_basis.startswith("UNRESOLVED_")
+                ),
+                "note": (
+                    "Python findings are syntax-gated and configuration artifacts are lexical. "
+                    "Other-language matches are leads only and cannot drive conclusions."
+                ),
+            },
             "summary": {cat: len(items) for cat, items in by_cat.items()},
             "truncated": [t.to_dict() for t in self.truncated],
             "files_skipped_size": self.files_skipped_size,
@@ -269,14 +303,118 @@ _PATTERNS: list[tuple[str, str, re.Pattern[str], Confidence]] = [
     ),
 ]
 
+_CONFIG_EXTS = frozenset({".json", ".yaml", ".yml", ".toml", ".env", ".cfg", ".ini"})
+_PY_STRUCTURAL_NODES = (
+    ast.Import, ast.ImportFrom, ast.Call, ast.Assign, ast.AnnAssign, ast.NamedExpr,
+    ast.FunctionDef, ast.AsyncFunctionDef,
+)
+_PY_STRING_ALLOWED_NAMES = frozenset({
+    "System prompt variable", "Prompt template", "Generic prompt variable",
+    "Model API key env var", "Possible hardcoded API key", "Generic API key reference",
+    "Env-based credential reference", "OpenAI-compatible HTTP endpoint",
+    "Whisper transcription endpoint", "MCP server config", "Function-calling config",
+    "Chat role message", "Chat messages array",
+})
+
+
+@dataclass(frozen=True)
+class _PythonSyntax:
+    parsed: bool
+    structural_spans: tuple[tuple[int, int, int, int], ...] = ()
+    comment_spans: tuple[tuple[int, int, int, int], ...] = ()
+    string_spans: tuple[tuple[int, int, int, int], ...] = ()
+    unresolved_spans: tuple[tuple[int, int, int, int], ...] = ()
+
+
+def _contains(span: tuple[int, int, int, int], line: int, column: int) -> bool:
+    sl, sc, el, ec = span
+    return (line, column) >= (sl, sc) and (line, column) < (el, ec)
+
+
+def _python_syntax(text: str) -> _PythonSyntax:
+    comments: list[tuple[int, int, int, int]] = []
+    strings: list[tuple[int, int, int, int]] = []
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            span = (token.start[0], token.start[1], token.end[0], token.end[1])
+            if token.type == tokenize.COMMENT:
+                comments.append(span)
+            elif token.type == tokenize.STRING:
+                strings.append(span)
+    except (tokenize.TokenError, IndentationError):
+        pass
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return _PythonSyntax(False, comment_spans=tuple(comments), string_spans=tuple(strings))
+    spans_list = [
+        (node.lineno, node.col_offset, node.end_lineno, node.end_col_offset)
+        for node in ast.walk(tree)
+        if isinstance(node, _PY_STRUCTURAL_NODES)
+        and hasattr(node, "end_lineno")
+        and node.end_lineno is not None
+    ]
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            spans_list.extend(
+                (decorator.lineno, max(0, decorator.col_offset - 1), decorator.end_lineno, decorator.end_col_offset)
+                for decorator in node.decorator_list
+                if getattr(decorator, "end_lineno", None) is not None
+            )
+    unresolved: list[tuple[int, int, int, int]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If) and isinstance(node.test, ast.Constant) and not node.test.value:
+            unresolved.extend(
+                (child.lineno, child.col_offset, child.end_lineno, child.end_col_offset)
+                for child in node.body
+                if getattr(child, "end_lineno", None) is not None
+            )
+    return _PythonSyntax(
+        True, tuple(spans_list), tuple(comments), tuple(strings), tuple(unresolved)
+    )
+
+
+def _classify_match_basis(
+    suffix: str, syntax: _PythonSyntax | None, text: str, match_start: int, name: str
+) -> tuple[str, bool] | None:
+    """Classify evidence, dropping Python comments and inert code-like strings."""
+    if suffix != ".py":
+        if suffix in _CONFIG_EXTS:
+            return "CONFIG_ARTIFACT", True
+        return "LEXICAL_LEAD", False
+    assert syntax is not None
+    before = text[:match_start]
+    line = before.count("\n") + 1
+    column = match_start - (before.rfind("\n") + 1)
+    if any(_contains(span, line, column) for span in syntax.comment_spans):
+        return "LEXICAL_LEAD", False
+    in_string = any(_contains(span, line, column) for span in syntax.string_spans)
+    if not syntax.parsed:
+        return "UNRESOLVED_PARSE", False
+    if any(_contains(span, line, column) for span in syntax.unresolved_spans):
+        return "UNRESOLVED_STATIC", False
+    positions = (column, column + 1) if name == "Tool/function decorator" else (column,)
+    if not any(
+        _contains(span, line, candidate) for span in syntax.structural_spans for candidate in positions
+    ):
+        return None
+    if in_string and name not in _PY_STRING_ALLOWED_NAMES:
+        return None
+    return "PYTHON_AST", True
+
 
 def _iter_candidate_files(root_path: Path):
     for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
             full = Path(dirpath) / name
-            if full.suffix.lower() not in SCAN_EXTS:
+            if _scan_suffix(full) not in SCAN_EXTS:
                 continue
             yield full
+
+
+def _scan_suffix(path: Path) -> str:
+    """Return the scan type, including dotfiles for which Path.suffix is empty."""
+    return ".env" if path.name == ".env" else path.suffix.lower()
 
 
 def _read_text_with_reason(path: Path) -> tuple[str | None, str | None]:
@@ -391,9 +529,15 @@ def discover_ai(
         # Classify the file's context once (content-aware), reused for every
         # finding in this file. (Phase 8D)
         file_ctx = classify_file(rel, content=text)
+        suffix = _scan_suffix(file_path)
+        syntax = _python_syntax(text) if suffix == ".py" else None
 
         for category, name, pattern, confidence in _PATTERNS:
             for match in pattern.finditer(text):
+                classified = _classify_match_basis(suffix, syntax, text, match.start(), name)
+                if classified is None:
+                    continue
+                evidence_basis, supports_conclusions = classified
                 line_no = text.count("\n", 0, match.start()) + 1
                 location_key = (rel, line_no, category, name)
                 fid = location_ids.get(location_key, "")
@@ -470,6 +614,8 @@ def discover_ai(
                         context=file_ctx.context,
                         context_confidence=file_ctx.confidence,
                         context_defaulted=file_ctx.defaulted,
+                        evidence_basis=evidence_basis,
+                        supports_conclusions=supports_conclusions,
                     )
                 )
 

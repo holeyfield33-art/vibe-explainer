@@ -7,8 +7,9 @@ output for analyst validation.
 
 It is a pre-release evidence tool. It is not a vulnerability scanner, penetration test,
 compliance assessment, certification, or proof that a control is effective. Current
-discovery is primarily regex-based, while Python relationships require bounded AST
-def-use or direct-import evidence.
+Python discovery is gated by AST/token structure, while configuration artifacts use
+bounded lexical matching. Other-language matches are retained as non-authoritative leads.
+Python relationships require bounded AST def-use or direct-import evidence.
 Default reports intentionally contain no numeric concern severity or awarded maturity
 level.
 
@@ -82,12 +83,16 @@ analyst confirmation.
 
 ## Supported and unsupported analysis
 
-The strongest current detection coverage is for common Python and JavaScript/TypeScript
-AI idioms. Other listed extensions receive lexical scanning with uneven coverage.
+Authoritative source-code discovery currently covers common Python imports, calls,
+assignments, and decorators. JSON, YAML, TOML, env, cfg, and ini files are treated as
+configuration artifacts. JavaScript/TypeScript, Go, Rust, Java, and Ruby matches are
+reported as lexical leads and cannot drive risk, control, readiness, data-flow, or ASI
+conclusions.
 
 Current limitations:
 
-- General discovery is not yet syntax-aware across supported languages.
+- Syntax-aware authoritative discovery is currently Python-only; other code languages
+  remain lead-only until a parser-backed analyzer is available.
 - Structural relationships remain bounded static inference, not runtime flow proof.
 - Import-resolved cross-file relationships show reachability, not proven data flow.
 - Control discovery begins with named patterns; Python enforcement relationships use
@@ -109,7 +114,12 @@ The complete release gate and implementation order are in
 python -m pytest
 python -m coverage run -m pytest
 python -m coverage report --fail-under=90
+python -m vibe_explainer.validation --output validation/metrics.json --check
+git diff --exit-code -- validation/metrics.json
 ```
+
+The validation command reproduces the separate detection-quality artifact. See
+[docs/VALIDATION.md](docs/VALIDATION.md) for metric definitions and label-review status.
 
 Architecture and historical implementation notes are under `docs/`. `SECURITY.md`
 defines the current scanner boundary and sensitive-report handling expectations.

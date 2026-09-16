@@ -14,4 +14,7 @@ build/
 EXPLAIN.md
 *.json
 !horos.json
+!validation/
+!validation/corpus.json
+!validation/metrics.json
 .DS_Store

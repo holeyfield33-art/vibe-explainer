@@ -131,7 +131,7 @@ say "here's what would move you to Level N+1" without re-deriving it.
 
 ## 11. Examples
 
-- **No-AI repository**: `readiness_level=None`, `readiness_name="NO_AI_SURFACE"` — not
+- **No supported AI evidence**: `readiness_level=None`, `readiness_name="NO_SUPPORTED_AI_EVIDENCE"` — not
   Level 1 `NOT_ACHIEVED`, a distinct state, since there's no AI security question to
   answer at all.
 - **Baseline**: `basic-chatbot` — AI discovered, zero process evidence → Level 1,

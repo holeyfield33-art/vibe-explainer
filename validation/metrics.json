@@ -1,0 +1,528 @@
+{
+  "by_construct": {
+    "alias": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "assignment": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "call": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "comment": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 1.0
+    },
+    "configuration": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "dead_code": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 1.0,
+      "unsupported_rate": 0.0
+    },
+    "decorator": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "example_context": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "framework": {
+      "cases": 2,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 2,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "generated_context": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "import": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "multi_file": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "negative_control": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "obfuscation": {
+      "cases": 1,
+      "disposition_accuracy": 0.0,
+      "false_negative": 1,
+      "false_positive": 0,
+      "precision": null,
+      "recall": 0.0,
+      "true_negative": 0,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "parse_failure": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 1.0,
+      "unsupported_rate": 0.0
+    },
+    "real_world": {
+      "cases": 2,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 2,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "retrieval": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "string": {
+      "cases": 2,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 2,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "test_context": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "unsupported_language": {
+      "cases": 2,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 2,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 1.0
+    },
+    "wrapper": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    }
+  },
+  "by_language": {
+    "javascript": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 1.0
+    },
+    "python": {
+      "cases": 22,
+      "disposition_accuracy": 0.9545,
+      "false_negative": 1,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 0.9375,
+      "true_negative": 6,
+      "true_positive": 15,
+      "unresolved_rate": 0.0909,
+      "unsupported_rate": 0.0455
+    },
+    "structured_config": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negative": 0,
+      "true_positive": 1,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 0.0
+    },
+    "typescript": {
+      "cases": 1,
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "precision": null,
+      "recall": null,
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 0.0,
+      "unsupported_rate": 1.0
+    }
+  },
+  "cases": [
+    {
+      "actual": "authoritative",
+      "construct": "import",
+      "expected": "authoritative",
+      "id": "py_openai_import",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "alias",
+      "expected": "authoritative",
+      "id": "py_aliased_import",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "wrapper",
+      "expected": "authoritative",
+      "id": "py_wrapper",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "call",
+      "expected": "authoritative",
+      "id": "py_chat_call",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "assignment",
+      "expected": "authoritative",
+      "id": "py_prompt_assignment",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "decorator",
+      "expected": "authoritative",
+      "id": "py_tool_decorator",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "retrieval",
+      "expected": "authoritative",
+      "id": "py_rag_call",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "framework",
+      "expected": "authoritative",
+      "id": "py_mcp_server",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "framework",
+      "expected": "authoritative",
+      "id": "py_langchain_variant",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "unsupported",
+      "construct": "comment",
+      "expected": "unsupported",
+      "id": "py_comment_signature",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "none",
+      "construct": "string",
+      "expected": "none",
+      "id": "py_string_embedded_call",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "none",
+      "construct": "string",
+      "expected": "none",
+      "id": "py_bare_provider_string",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "unresolved",
+      "construct": "dead_code",
+      "expected": "unresolved",
+      "id": "py_dead_branch",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "unresolved",
+      "construct": "parse_failure",
+      "expected": "unresolved",
+      "id": "py_parse_failure",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "none",
+      "construct": "obfuscation",
+      "expected": "authoritative",
+      "id": "py_obfuscated_import",
+      "language": "python",
+      "passed": false
+    },
+    {
+      "actual": "unsupported",
+      "construct": "unsupported_language",
+      "expected": "unsupported",
+      "id": "ts_vercel_sdk",
+      "language": "typescript",
+      "passed": true
+    },
+    {
+      "actual": "unsupported",
+      "construct": "unsupported_language",
+      "expected": "unsupported",
+      "id": "js_openai_endpoint",
+      "language": "javascript",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "configuration",
+      "expected": "authoritative",
+      "id": "config_model_key",
+      "language": "structured_config",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "generated_context",
+      "expected": "authoritative",
+      "id": "generated_context",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "test_context",
+      "expected": "authoritative",
+      "id": "test_context",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "example_context",
+      "expected": "authoritative",
+      "id": "example_context",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "multi_file",
+      "expected": "authoritative",
+      "id": "multi_file_import",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "none",
+      "construct": "negative_control",
+      "expected": "none",
+      "id": "plain_python",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "real_world",
+      "expected": "authoritative",
+      "id": "real_openai_sdk_readme",
+      "language": "python",
+      "passed": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "real_world",
+      "expected": "authoritative",
+      "id": "real_anthropic_sdk_readme",
+      "language": "python",
+      "passed": true
+    }
+  ],
+  "corpus_version": "2026.09.15-1",
+  "label_review": {
+    "labeler": "implementation team",
+    "note": "Metrics are provisional until the checked-in labels receive independent review.",
+    "required_reviewer": "independent reviewer who did not implement the detector",
+    "status": "PENDING_INDEPENDENT_REVIEW"
+  },
+  "overall": {
+    "cases": 25,
+    "disposition_accuracy": 0.96,
+    "false_negative": 1,
+    "false_positive": 0,
+    "precision": 1.0,
+    "recall": 0.9412,
+    "true_negative": 8,
+    "true_positive": 16,
+    "unresolved_rate": 0.08,
+    "unsupported_rate": 0.12
+  },
+  "schema_version": "1.0"
+}

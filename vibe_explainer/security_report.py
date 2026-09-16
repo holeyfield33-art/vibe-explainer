@@ -200,12 +200,15 @@ def build_report(
                 "context": getattr(f, "context", None) or classify_path(f.file),
                 "context_confidence": getattr(f, "context_confidence", "moderate"),
                 "context_defaulted": getattr(f, "context_defaulted", False),
+                "evidence_basis": getattr(f, "evidence_basis", "PYTHON_AST"),
+                "supports_conclusions": getattr(f, "supports_conclusions", True),
             }
         )
     for items in by_category.values():
         items.sort(key=lambda i: (i["file"], i["line"], i["id"]))
     ai_inventory = {
         "categories": dict(sorted(by_category.items())),
+        "analysis_coverage": discovery.to_dict()["analysis_coverage"],
         "truncated": [t.to_dict() for t in discovery.truncated],
         "truncation_notice": (
             "Some files contained many repeated matches of the same pattern; these were "
@@ -228,6 +231,8 @@ def build_report(
                 "security_relevance": i.security_relevance,
                 "context": getattr(i, "context", None) or classify_path(i.file),
                 "context_defaulted": getattr(i, "context_defaulted", False),
+                "evidence_basis": getattr(i, "evidence_basis", "PYTHON_AST"),
+                "supports_conclusions": getattr(i, "supports_conclusions", True),
             }
             for i in sorted(by_bucket[b], key=lambda i: (i.file, i.line, i.finding_id))
         ]

@@ -328,16 +328,25 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("Observed AI-related evidence, grouped by category. Every finding above traces to "
         "an entry here by ID.")
     add("")
+    coverage = report.ai_inventory.get("analysis_coverage", {})
+    if coverage:
+        add(
+            f"**Analysis coverage:** {', '.join(coverage.get('supported_languages', []))}. "
+            f"Authoritative findings: {coverage.get('authoritative_findings', 0)}; "
+            f"unsupported lexical leads: {coverage.get('unsupported_lexical_leads', 0)}."
+        )
+        add("")
     if report.ai_inventory.get("truncation_notice"):
         add(f"> **{report.ai_inventory['truncation_notice']}**")
         add("")
     for category, findings in report.ai_inventory["categories"].items():
         add(f"### {category.replace('_', ' ').title()}")
         add("")
-        add("| Finding ID | Location | Name | Confidence | Evidence |")
-        add("|---|---|---|---|---|")
+        add("| Finding ID | Location | Name | Basis | Conclusion use | Confidence | Evidence |")
+        add("|---|---|---|---|---|---|---|")
         for f in findings:
-            add(f"| `{f['id']}` | `{f['file']}:{f['line']}` | {f['name']} | {f['confidence']} | {_cell(f['evidence'])} |")
+            conclusion_use = "eligible" if f.get("supports_conclusions", True) else "lead only"
+            add(f"| `{f['id']}` | `{f['file']}:{f['line']}` | {f['name']} | {f.get('evidence_basis', 'UNKNOWN')} | {conclusion_use} | {f['confidence']} | {_cell(f['evidence'])} |")
         add("")
     add("---")
     add("")

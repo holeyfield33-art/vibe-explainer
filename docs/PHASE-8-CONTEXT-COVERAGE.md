@@ -112,7 +112,7 @@ cross-file Python and JS/TS relationships resolve; unrelated files generate no
 cross-file edges; confidence levels documented and keyed to resolution method; all
 report references resolve (no dangling IDs); secret redaction holds across every
 report section; default CLI and `--security` / `--security --json` remain backward-
-compatible; no-AI repositories remain NO_AI_SURFACE; risk and readiness remain
+compatible; repositories without supported AI evidence remain NO_SUPPORTED_AI_EVIDENCE; risk and readiness remain
 independent; Vibe Explainer's own generated artifacts cannot inflate its readiness;
 new tests cover every bug class fixed in this phase.
 

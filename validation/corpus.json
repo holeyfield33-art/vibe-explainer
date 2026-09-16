@@ -1,0 +1,229 @@
+{
+  "version": "2026.09.15-1",
+  "label_review": {
+    "status": "PENDING_INDEPENDENT_REVIEW",
+    "labeler": "implementation team",
+    "required_reviewer": "independent reviewer who did not implement the detector",
+    "note": "Metrics are provisional until the checked-in labels receive independent review."
+  },
+  "cases": [
+    {
+      "id": "py_openai_import",
+      "language": "python",
+      "construct": "import",
+      "path": "app.py",
+      "source": "from openai import OpenAI\nclient = OpenAI()\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_aliased_import",
+      "language": "python",
+      "construct": "alias",
+      "path": "app.py",
+      "source": "from openai import OpenAI as Client\nclient = Client()\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_wrapper",
+      "language": "python",
+      "construct": "wrapper",
+      "path": "client.py",
+      "source": "import openai as provider\ndef build_client():\n    return provider.OpenAI()\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_chat_call",
+      "language": "python",
+      "construct": "call",
+      "path": "chat.py",
+      "source": "response = client.chat.completions.create(model=\"gpt-4o\", messages=[])\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_prompt_assignment",
+      "language": "python",
+      "construct": "assignment",
+      "path": "prompt.py",
+      "source": "SYSTEM_PROMPT = \"Be concise\"\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_tool_decorator",
+      "language": "python",
+      "construct": "decorator",
+      "path": "tools.py",
+      "source": "@tool\ndef lookup(query: str):\n    return query\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_rag_call",
+      "language": "python",
+      "construct": "retrieval",
+      "path": "rag.py",
+      "source": "docs = store.similarity_search(query)\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_mcp_server",
+      "language": "python",
+      "construct": "framework",
+      "path": "server.py",
+      "source": "from mcp.server.fastmcp import FastMCP\nserver = FastMCP(\"demo\")\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_langchain_variant",
+      "language": "python",
+      "construct": "framework",
+      "path": "chain.py",
+      "source": "from langchain.agents import create_agent\nagent = create_agent(model, tools=[])\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "py_comment_signature",
+      "language": "python",
+      "construct": "comment",
+      "path": "app.py",
+      "source": "# from openai import OpenAI\nvalue = 1\n",
+      "expected": "unsupported"
+    },
+    {
+      "id": "py_string_embedded_call",
+      "language": "python",
+      "construct": "string",
+      "path": "app.py",
+      "source": "example = \"client.chat.completions.create(model='gpt-4o')\"\n",
+      "expected": "none"
+    },
+    {
+      "id": "py_bare_provider_string",
+      "language": "python",
+      "construct": "string",
+      "path": "labels.py",
+      "source": "label = \"openai\"\n",
+      "expected": "none"
+    },
+    {
+      "id": "py_dead_branch",
+      "language": "python",
+      "construct": "dead_code",
+      "path": "dead.py",
+      "source": "if False:\n    from openai import OpenAI\n",
+      "expected": "unresolved"
+    },
+    {
+      "id": "py_parse_failure",
+      "language": "python",
+      "construct": "parse_failure",
+      "path": "broken.py",
+      "source": "from openai import\n",
+      "expected": "unresolved"
+    },
+    {
+      "id": "py_obfuscated_import",
+      "language": "python",
+      "construct": "obfuscation",
+      "path": "hidden.py",
+      "source": "provider = __import__(\"op\" + \"enai\")\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "ts_vercel_sdk",
+      "language": "typescript",
+      "construct": "unsupported_language",
+      "path": "app.ts",
+      "source": "import { streamText } from 'ai';\nstreamText({ model });\n",
+      "expected": "unsupported"
+    },
+    {
+      "id": "js_openai_endpoint",
+      "language": "javascript",
+      "construct": "unsupported_language",
+      "path": "app.js",
+      "source": "fetch('https://api.openai.com/v1/chat/completions');\n",
+      "expected": "unsupported"
+    },
+    {
+      "id": "config_model_key",
+      "language": "structured_config",
+      "construct": "configuration",
+      "path": ".env",
+      "source": "OPENAI_API_KEY=replace-me\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "generated_context",
+      "language": "python",
+      "construct": "generated_context",
+      "path": "generated/client.py",
+      "source": "from openai import OpenAI\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "test_context",
+      "language": "python",
+      "construct": "test_context",
+      "path": "tests/test_client.py",
+      "source": "from openai import OpenAI\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "example_context",
+      "language": "python",
+      "construct": "example_context",
+      "path": "examples/demo.py",
+      "source": "from anthropic import Anthropic\nclient = Anthropic()\n",
+      "expected": "authoritative"
+    },
+    {
+      "id": "multi_file_import",
+      "language": "python",
+      "construct": "multi_file",
+      "path": "unused.py",
+      "source": "",
+      "files": [
+        {"path": "provider.py", "source": "from openai import OpenAI\nclient = OpenAI()\n"},
+        {"path": "app.py", "source": "from provider import client\nresult = client.chat.completions.create(model='gpt-4o', messages=[])\n"}
+      ],
+      "expected": "authoritative"
+    },
+    {
+      "id": "plain_python",
+      "language": "python",
+      "construct": "negative_control",
+      "path": "maths.py",
+      "source": "def add(a, b):\n    return a + b\n",
+      "expected": "none"
+    },
+    {
+      "id": "real_openai_sdk_readme",
+      "language": "python",
+      "construct": "real_world",
+      "path": "example.py",
+      "source": "from openai import OpenAI\nclient = OpenAI()\nresponse = client.responses.create(model=\"gpt-5.2\", input=\"Hello\")\n",
+      "expected": "authoritative",
+      "provenance": {
+        "repository": "https://github.com/openai/openai-python",
+        "commit": "98e1d24f4902ab58830adf0e2b6a729a5d5429b1",
+        "source_path": "README.md",
+        "license": "Apache-2.0",
+        "adaptation": "Credential-free minimal excerpt adapted for static analysis."
+      }
+    },
+    {
+      "id": "real_anthropic_sdk_readme",
+      "language": "python",
+      "construct": "real_world",
+      "path": "example.py",
+      "source": "import os\nfrom anthropic import Anthropic\nclient = Anthropic(api_key=os.environ.get(\"ANTHROPIC_API_KEY\"))\nmessage = client.messages.create(model=\"claude-opus-4-6\", max_tokens=32, messages=[])\n",
+      "expected": "authoritative",
+      "provenance": {
+        "repository": "https://github.com/anthropics/anthropic-sdk-python",
+        "commit": "7e5ca5c94126a6d7de159a169ff43eb9b1cac57f",
+        "source_path": "README.md",
+        "license": "MIT",
+        "adaptation": "Credential-free minimal excerpt adapted for static analysis."
+      }
+    }
+  ]
+}

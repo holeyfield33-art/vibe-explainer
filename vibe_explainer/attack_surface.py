@@ -63,6 +63,8 @@ class AttackSurfaceItem:
     finding_id: str = ""  # traces back to the source AIFinding.id
     context: str = "PRODUCTION"  # Phase 8: file context of the source finding
     context_defaulted: bool = False
+    evidence_basis: str = "PYTHON_AST"
+    supports_conclusions: bool = True
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -77,6 +79,8 @@ class AttackSurfaceItem:
             "finding_id": self.finding_id,
             "context": self.context,
             "context_defaulted": self.context_defaulted,
+            "evidence_basis": self.evidence_basis,
+            "supports_conclusions": self.supports_conclusions,
         }
 
 
@@ -152,6 +156,8 @@ def build_attack_surface(discovery: DiscoveryResult, *, include_dataflow: bool =
                 finding_id=finding.id,
                 context=getattr(finding, "context", "PRODUCTION"),
                 context_defaulted=getattr(finding, "context_defaulted", False),
+                evidence_basis=getattr(finding, "evidence_basis", "PYTHON_AST"),
+                supports_conclusions=getattr(finding, "supports_conclusions", True),
             )
         )
     if include_dataflow:

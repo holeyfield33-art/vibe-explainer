@@ -330,5 +330,45 @@ class TestEarlyEvidenceRedaction(unittest.TestCase):
             self.assertIn("[REDACTED]", serialized)
 
 
+class TestSyntaxAwareDiscovery(unittest.TestCase):
+    def test_python_comments_and_embedded_sdk_calls_are_leads_not_evidence(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            Path(root_dir, "app.py").write_text(
+                '# from openai import OpenAI\n'
+                'example = "client.chat.completions.create(model=\\"gpt-4o\\")"\n'
+            )
+            result = discover_ai(root_dir)
+
+            self.assertFalse(result.has_ai_signal())
+            self.assertTrue(result.has_any_lead())
+            self.assertTrue(all(not finding.supports_conclusions for finding in result.findings))
+
+    def test_aliased_python_import_is_structural_evidence(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            Path(root_dir, "app.py").write_text(
+                "from openai import OpenAI as Client\nclient = Client()\n"
+            )
+            result = discover_ai(root_dir)
+
+            provider = next(f for f in result.findings if f.name == "OpenAI")
+            self.assertTrue(provider.supports_conclusions)
+            self.assertEqual(provider.evidence_basis, "PYTHON_AST")
+            self.assertTrue(result.has_ai_signal())
+
+    def test_unsupported_language_match_cannot_establish_ai_signal(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            Path(root_dir, "app.ts").write_text(
+                'import OpenAI from "openai";\nstreamText({ model: client });\n'
+            )
+            result = discover_ai(root_dir)
+
+            self.assertFalse(result.has_ai_signal())
+            self.assertTrue(result.findings)
+            self.assertTrue(all(f.evidence_basis == "LEXICAL_LEAD" for f in result.findings))
+            coverage = result.to_dict()["analysis_coverage"]
+            self.assertEqual(coverage["authoritative_findings"], 0)
+            self.assertGreater(coverage["unsupported_lexical_leads"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()

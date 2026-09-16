@@ -27,6 +27,10 @@ jobs:
     - name: Run test suite (pytest)
       run: |
         python -m pytest
+    - name: Reproduce detection-quality metrics
+      run: |
+        python -m vibe_explainer.validation --output validation/metrics.json --check
+        git diff --exit-code -- validation/metrics.json
     - name: Run tests with branch coverage
       run: |
         python -m coverage run -m pytest

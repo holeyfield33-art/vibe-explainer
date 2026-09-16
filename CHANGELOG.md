@@ -7,6 +7,17 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Gate Python AI discovery through AST/token structure; classify other-language matches
+  as non-authoritative lexical leads and prevent them from driving risk, controls,
+  readiness, data-flow, or ASI conclusions. Reports now publish supported constructs,
+  evidence basis, conclusion eligibility, and unresolved parse/static cases.
+- Add a versioned adversarial detection corpus and deterministic offline metric runner.
+  Provisional corpus v2026.09.15-1 reports 100% precision and 94.12% recall overall
+  (100% precision and 93.75% recall for Python),
+  with unsupported and unresolved rates published per language and construct. Labels
+  remain explicitly pending independent review, and the known obfuscated-import miss is
+  retained as a false negative.
+
 - Replace nearest-line data-flow edges with bounded Python AST def-use, direct imported
   symbol, and direct imported-call relationships. Proximity-only candidates are retained
   with explicit unresolved reasons and cannot drive concern scenarios.
@@ -89,12 +100,12 @@ uses pre-release versioning while its security evidence model is being hardened.
   exclusion, secret redaction on control-matching lines and in data-flow
   evidence, and scan-budget enforcement (oversized files, unreadable files,
   file-count budget exhaustion).
-- Enforce at least 90% branch coverage for the package. Current measured package
-  coverage is 94% with 208 tests.
+- Enforce at least 90% branch coverage for the package. Current local measurement is
+  91% with 357 tests, 5 platform skips, and 45 subtests.
 
 ### Known limitations
 
-- Static discovery remains primarily regex-based; file context is heuristic and
-  conservative-default production classifications require analyst review.
-- Data-flow edges remain same-file proximity inferences.
+- Authoritative source discovery is syntax-gated for Python and lexical for structured
+  configuration. Other source languages remain non-authoritative leads.
+- Data-flow relationships are bounded Python AST def-use and direct-import inferences.
 - Risk severity and readiness levels have not been empirically calibrated.
