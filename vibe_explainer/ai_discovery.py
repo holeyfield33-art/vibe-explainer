@@ -62,11 +62,16 @@ MAX_SCAN_SECONDS = 120.0
 Confidence = str  # "high" | "moderate" | "low"
 
 
-def _finding_id(file: str, line: int, category: str, name: str) -> str:
+def _finding_id(
+    file: str, line: int, category: str, name: str, *, stable_locator: str | None = None
+) -> str:
     """Deterministic short ID so later phases (data-flow, controls) can reference
     a specific finding without re-deriving identity from its fields. Stable across
-    runs on unchanged code; changes only if the underlying match moves/changes."""
-    digest = hashlib.sha1(f"{file}:{line}:{category}:{name}".encode("utf-8")).hexdigest()
+    runs on unchanged code. Scanned findings use a stable per-signal occurrence
+    locator so unrelated line insertions do not churn identity; direct callers
+    retain line-based compatibility."""
+    locator = stable_locator if stable_locator is not None else f"line:{line}"
+    digest = hashlib.sha1(f"{file}:{locator}:{category}:{name}".encode("utf-8")).hexdigest()
     return digest[:12]
 
 
@@ -347,6 +352,8 @@ def discover_ai(
     # objects sharing the same id. Track by id so that case upgrades confidence
     # in place instead of creating a duplicate identity.
     index_by_id: dict[str, int] = {}
+    location_ids: dict[tuple[str, int, str, str], str] = {}
+    signal_occurrences: dict[tuple[str, str, str], int] = {}
     truncated_ids: set[str] = set()  # (file,line,category,name) identities already counted as truncated
     _CONFIDENCE_PRIORITY = {"high": 3, "moderate": 2, "low": 1}
     file_texts: dict[str, str] = {}  # rel -> content, for Phase 8G import resolution
@@ -388,7 +395,16 @@ def discover_ai(
         for category, name, pattern, confidence in _PATTERNS:
             for match in pattern.finditer(text):
                 line_no = text.count("\n", 0, match.start()) + 1
-                fid = _finding_id(rel, line_no, category, name)
+                location_key = (rel, line_no, category, name)
+                fid = location_ids.get(location_key, "")
+                if not fid:
+                    signal_key = (rel, category, name)
+                    occurrence = signal_occurrences.get(signal_key, 0) + 1
+                    signal_occurrences[signal_key] = occurrence
+                    fid = _finding_id(
+                        rel, line_no, category, name, stable_locator=f"occurrence:{occurrence}"
+                    )
+                    location_ids[location_key] = fid
 
                 if fid in index_by_id:
                     # same (file, line, category, name) identity already
@@ -450,6 +466,7 @@ def discover_ai(
                         line=line_no,
                         evidence=evidence,
                         confidence=effective_confidence,
+                        id=fid,
                         context=file_ctx.context,
                         context_confidence=file_ctx.confidence,
                         context_defaulted=file_ctx.defaulted,

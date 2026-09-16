@@ -385,7 +385,7 @@ class TestCLI(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = self._run(str(root), "--json", "--out", str(output))
+            result = self._run(str(root), "--json", "--out", str(output), "--force")
 
             self.assertEqual(result.returncode, 0)
             payload = json.loads(output.read_text(encoding="utf-8"))

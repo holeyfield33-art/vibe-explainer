@@ -7,6 +7,14 @@ uses pre-release versioning while its security evidence model is being hardened.
 
 ### Security
 
+- Add PEP 621 packaging and an installed `vibe-explainer` console command for Python
+  3.11–3.14; define a single version source and release/schema compatibility policy.
+- Publish report schema 2.0 for occurrence-based evidence identity and the revised
+  control-status vocabulary. Process evidence identity now includes kind, path, and
+  description so distinct signals in one file cannot collide.
+- Write outputs atomically, preserve existing files unless `--force` is explicit, and
+  exclude the active destination from scanning to prevent self-ingestion.
+
 - Replace the ASI mapper's single precedence status with independent applicability,
   class-evidence, per-control mitigation, unresolved-assumption, and manual-review axes.
   Protocol compatibility can no longer manufacture `CONTROL_GAP`, and conflicting

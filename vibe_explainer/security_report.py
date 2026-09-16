@@ -123,7 +123,7 @@ def build_report(
     metadata = {
         "tool": "vibe-explainer",
         "version": __version__,
-        "schema_version": "1.1",
+        "schema_version": "2.0",
         "repository": repo_name,
         "repository_path": discovery.root,
         "assessment_completeness": readiness.assessment_completeness,

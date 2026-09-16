@@ -13,25 +13,31 @@ level.
 
 ## Quick start
 
-Python 3.11 or 3.12 is currently tested in CI.
+Python 3.11 through 3.14 is supported and included in the CI matrix.
 
 ```bash
+# Install the package and console command
+python -m pip install .
+
 # Concise terminal evidence review (default)
-python -m vibe_explainer /path/to/repo
+vibe-explainer /path/to/repo
 
 # Machine-readable evidence and limitations
-python -m vibe_explainer /path/to/repo --json
+vibe-explainer /path/to/repo --json
 
 # Detailed Markdown for analyst review
-python -m vibe_explainer /path/to/repo --report -o review.md
+vibe-explainer /path/to/repo --report -o review.md
 
 # Research compatibility only: include uncalibrated legacy scoring
-python -m vibe_explainer /path/to/repo --json --experimental-scoring
+vibe-explainer /path/to/repo --json --experimental-scoring
 
 # Optional mapping to a local Agent Security Index export
-python -m vibe_explainer /path/to/repo --json \
+vibe-explainer /path/to/repo --json \
   --asi-catalog /path/to/asi-catalog.json
 ```
+
+Output files are created atomically and are never replaced implicitly. Use `--force`
+only when replacing the named destination is intentional.
 
 `--security` and `--consultant` remain accepted as deprecated compatibility aliases.
 The original repository-orientation report is available only through

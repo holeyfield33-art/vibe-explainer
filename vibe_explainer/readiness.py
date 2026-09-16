@@ -405,7 +405,14 @@ def _evidence(type_: str, id_: str, description: str) -> ReadinessEvidenceRef:
 
 def _process_evidence_refs(items: list[_ProcessEvidence], limit: int = 5) -> list[ReadinessEvidenceRef]:
     ordered = sorted(items, key=lambda p: p.path)[:limit]
-    return [_evidence(EVIDENCE_PROCESS, hashlib.sha1(p.path.encode()).hexdigest()[:10], p.description) for p in ordered]
+    return [
+        _evidence(
+            EVIDENCE_PROCESS,
+            hashlib.sha1(f"{p.kind}:{p.path}:{p.description}".encode()).hexdigest()[:10],
+            p.description,
+        )
+        for p in ordered
+    ]
 
 
 def _control(controls: ControlAssessment, control_id: str):

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
 from . import __version__
 from .integrate_vibe_check import load_vibe_check_report, summarize_vibe_findings
+from .output import OutputExistsError, atomic_write_text
 from .report import render_markdown
 from .scanner import scan_repo
 from .security_utils import redact_secrets, redact_structure
@@ -19,6 +21,28 @@ def _print_portable(output: str) -> None:
     encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
     portable = output.encode(encoding, errors="replace").decode(encoding)
     print(portable)
+
+
+def _git_provenance(repo: Path) -> dict[str, object]:
+    def git(*args: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(repo), *args], capture_output=True, text=True,
+                timeout=5, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    commit = git("rev-parse", "HEAD")
+    branch = git("branch", "--show-current")
+    status = git("status", "--porcelain", "--untracked-files=normal")
+    return {
+        "commit": commit,
+        "branch": branch or None,
+        "dirty": bool(status) if status is not None else None,
+        "available": commit is not None,
+    }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -82,6 +106,11 @@ def build_parser() -> argparse.ArgumentParser:
             "Map the evidence review onto a local Agent Security Index "
             "export directory or attack-class JSON. No network fetch is performed."
         ),
+    )
+    p.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace an existing --out file. Without this flag, existing files are preserved.",
     )
     p.add_argument(
         "--experimental-scoring",
@@ -180,6 +209,7 @@ def _run_security_mode(
     out: str | None,
     asi_catalog: str | None = None,
     experimental_scoring: bool = False,
+    force: bool = False,
 ) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
@@ -216,6 +246,12 @@ def _run_security_mode(
             readiness,
             include_experimental_scoring=experimental_scoring,
         )
+        report.metadata["repository_revision"] = _git_provenance(repo)
+        report.metadata["scan_configuration"] = {
+            "excluded_paths": sorted(excluded_paths),
+            "experimental_scoring": experimental_scoring,
+            "asi_catalog_supplied": bool(asi_catalog),
+        }
 
         asi_matrix = None
         if asi_catalog:
@@ -223,6 +259,9 @@ def _run_security_mode(
 
             catalog = load_asi_catalog(asi_catalog)
             asi_matrix = map_report_to_asi(report, catalog)
+            report.metadata["scan_configuration"]["asi_catalog_sha256"] = (
+                asi_matrix.get("catalog", {}).get("source_hash")
+            )
     except Exception as exc:  # noqa: BLE001 — surface cleanly, never a raw traceback
         print(redact_secrets(f"Unable to analyze repository:\n{exc}"), file=sys.stderr)
         return 1
@@ -245,7 +284,11 @@ def _run_security_mode(
         output = redact_secrets(output)
     if out:
         out_path = Path(out)
-        out_path.write_text(output, encoding="utf-8")
+        try:
+            atomic_write_text(out_path, output, overwrite=force)
+        except OutputExistsError as exc:
+            print(redact_secrets(f"Unable to write report: {exc}"), file=sys.stderr)
+            return 2
         print(redact_secrets(f"Wrote {out_path}"), file=sys.stderr)
     else:
         _print_portable(output)
@@ -274,6 +317,7 @@ def main(argv: list[str] | None = None) -> int:
             args.out,
             args.asi_catalog,
             args.experimental_scoring,
+            args.force,
         )
 
     if args.json or args.detailed_report or args.asi_catalog or args.experimental_scoring:
@@ -305,7 +349,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.out:
         out_path = Path(args.out)
-        out_path.write_text(md, encoding="utf-8")
+        try:
+            atomic_write_text(out_path, md, overwrite=args.force)
+        except OutputExistsError as exc:
+            print(redact_secrets(f"Unable to write report: {exc}"), file=sys.stderr)
+            return 2
         print(redact_secrets(f"Wrote {out_path}"), file=sys.stderr)
     else:
         _print_portable(md)

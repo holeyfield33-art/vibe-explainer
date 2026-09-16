@@ -193,8 +193,8 @@ class _EvidenceMatch:
     text: str
 
 
-def _evidence_id(file: str, line: int, tag: str) -> str:
-    digest = hashlib.sha1(f"{file}:{line}:{tag}".encode("utf-8")).hexdigest()
+def _evidence_id(file: str, occurrence: int, tag: str) -> str:
+    digest = hashlib.sha1(f"{file}:occurrence:{occurrence}:{tag}".encode("utf-8")).hexdigest()
     return digest[:12]
 
 
@@ -407,10 +407,10 @@ def _pattern_evidence_refs(matches: list[_EvidenceMatch], limit: int = 5) -> lis
     return [
         EvidenceRef(
             type="pattern",
-            id=_evidence_id(m.file, m.line, m.tag),
+            id=_evidence_id(m.file, occurrence, m.tag),
             description=f"{m.tag} at {m.file}:{m.line} — \"{m.text}\"",
         )
-        for m in ordered
+        for occurrence, m in enumerate(ordered, start=1)
     ]
 
 
