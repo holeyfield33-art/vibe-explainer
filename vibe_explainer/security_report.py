@@ -442,12 +442,19 @@ def build_report(
 
     for s in sorted_scenarios:
         covered_control_ids.update(s.related_control_ids)
+        reachability_established = bool(s.related_dataflow_ids)
         recommendations.append(
             {
                 "title": s.title,
                 "why_it_matters": _redact_check(s.rationale),
                 "evidence_summary": f"{len(s.evidence)} evidence item(s) — see risk {s.risk_id} for detail.",
-                "suggested_action": _suggested_action_for(s.category),
+                "suggested_action": _suggested_action_for(
+                    s.category, reachability_established=reachability_established
+                ),
+                "reachability_status": (
+                    "STATICALLY_INFERRED" if reachability_established else "NOT_ESTABLISHED"
+                ),
+                "requires_analyst_review": True,
                 "related_risk_ids": [s.risk_id],
                 "related_control_ids": s.related_control_ids,
                 "_sort_key": (
@@ -475,6 +482,8 @@ def build_report(
                 "why_it_matters": public_blocked_reason,
                 "evidence_summary": "See the unscored process-evidence checklist for detail.",
                 "suggested_action": "Add reviewable evidence for the listed process check.",
+                "reachability_status": "NOT_APPLICABLE",
+                "requires_analyst_review": True,
                 "related_risk_ids": [],
                 "related_control_ids": [],
                 "_sort_key": (1, 0, 0),
@@ -494,6 +503,8 @@ def build_report(
                 "why_it_matters": c.rationale,
                 "evidence_summary": f"{len(c.related_finding_ids)} related finding(s).",
                 "suggested_action": _suggested_action_for_control(c.control_id),
+                "reachability_status": "NOT_ESTABLISHED",
+                "requires_analyst_review": True,
                 "related_risk_ids": [],
                 "related_control_ids": [c.control_id],
                 "_sort_key": (2, 0, c.control_id),
@@ -502,7 +513,8 @@ def build_report(
 
     recommendations.sort(key=lambda r: r["_sort_key"])
     for idx, rec in enumerate(recommendations):
-        rec["priority"] = f"P{idx}"
+        if include_experimental_scoring:
+            rec["priority"] = f"P{idx}"
         del rec["_sort_key"]
 
     # ---- Limitations -----------------------------------------------------
@@ -532,8 +544,8 @@ def build_report(
     )
 
 
-def _suggested_action_for(category: str) -> str:
-    return {
+def _suggested_action_for(category: str, *, reachability_established: bool) -> str:
+    actions = {
         "HIGH_IMPACT_ACTION": "Require explicit authorization before invoking the high-impact tool and add a regression test covering unauthorized invocation.",
         "TOOL_SECURITY": "Add an authorization or permission check in front of the tool-invocation path and cover it with a test.",
         "EXTERNAL_INTEGRATION": "Review what data the outbound call sends and confirm the credential used is appropriately scoped.",
@@ -542,8 +554,14 @@ def _suggested_action_for(category: str) -> str:
         "MCP_SECURITY": "Scope MCP tool permissions explicitly and default-deny unlisted tools.",
         "SECRET_EXPOSURE": "Move the credential to an environment variable or secret manager and rotate the exposed key.",
         "INPUT_SECURITY": "Add schema validation or sanitization on the user-influenced prompt path.",
-        "OUTPUT_SECURITY": "Add schema validation or sanitization on model output before it's used downstream.",
-    }.get(category, "Review the referenced evidence and add an appropriate control.")
+        "OUTPUT_SECURITY": "Evaluate output validation appropriate to the downstream boundary.",
+    }
+    if category == "OUTPUT_SECURITY" and not reachability_established:
+        return (
+            "If model output is consumed by a structured, privileged, or externally visible "
+            "downstream operation, evaluate output validation appropriate to that boundary."
+        )
+    return actions.get(category, "Review the referenced evidence and add an appropriate control.")
 
 
 def _suggested_action_for_control(control_id: str) -> str:
@@ -638,10 +656,11 @@ def render_text(report: VibeExplainerReport) -> str:
     add(sep)
 
     if report.recommendations:
-        add("RECOMMENDED ACTIONS")
+        add("RECOMMENDED ACTIONS" if experimental else "ANALYST REVIEW ACTIONS")
         add("")
         for rec in report.recommendations[:10]:
-            add(f"{rec['priority']}  {rec['title']}")
+            prefix = f"{rec['priority']}  " if experimental else "- "
+            add(f"{prefix}{rec['title']}")
         add("")
         add(sep)
 

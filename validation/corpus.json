@@ -1,5 +1,5 @@
 {
-  "version": "2026.09.16-2",
+  "version": "2026.09.16-3",
   "label_review": {
     "status": "PENDING_INDEPENDENT_REVIEW",
     "labeler": "implementation team",
@@ -59,6 +59,14 @@
       "construct": "decorator",
       "path": "tools.py",
       "source": "@tool\ndef lookup(query: str):\n    return query\n",
+      "expected": "unresolved"
+    },
+    {
+      "id": "py_tool_decorator_provenance",
+      "language": "python",
+      "construct": "decorator_provenance",
+      "path": "tools.py",
+      "source": "from langchain_core.tools import tool\n\n@tool\ndef lookup(query: str):\n    return query\n",
       "expected": "authoritative",
       "expected_findings": [{"category": "tool_agent", "name": "Tool/function decorator", "evidence_basis": "PYTHON_AST"}]
     },
@@ -68,6 +76,14 @@
       "construct": "retrieval",
       "path": "rag.py",
       "source": "docs = store.similarity_search(query)\n",
+      "expected": "unresolved"
+    },
+    {
+      "id": "py_rag_call_provenance",
+      "language": "python",
+      "construct": "retrieval_provenance",
+      "path": "rag.py",
+      "source": "from langchain_chroma import Chroma\n\nstore = Chroma(collection_name=\"docs\")\ndocs = store.similarity_search(query)\n",
       "expected": "authoritative",
       "expected_findings": [{"category": "rag_retrieval", "name": "Vector store / retriever", "evidence_basis": "PYTHON_AST"}]
     },

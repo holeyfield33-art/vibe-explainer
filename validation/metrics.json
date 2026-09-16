@@ -163,6 +163,33 @@
       "unsupported_rate": 0.0
     },
     "decorator": {
+      "authoritative_precision": null,
+      "authoritative_recall": null,
+      "cases": 1,
+      "context": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "finding_identity": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "relationship": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 1.0,
+      "unsupported_rate": 0.0
+    },
+    "decorator_provenance": {
       "authoritative_precision": 1.0,
       "authoritative_recall": 1.0,
       "cases": 1,
@@ -433,6 +460,33 @@
       "unsupported_rate": 0.0
     },
     "retrieval": {
+      "authoritative_precision": null,
+      "authoritative_recall": null,
+      "cases": 1,
+      "context": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "disposition_accuracy": 1.0,
+      "false_negative": 0,
+      "false_positive": 0,
+      "finding_identity": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "relationship": {
+        "accuracy": null,
+        "cases": 0,
+        "correct": 0
+      },
+      "true_negative": 1,
+      "true_positive": 0,
+      "unresolved_rate": 1.0,
+      "unsupported_rate": 0.0
+    },
+    "retrieval_provenance": {
       "authoritative_precision": 1.0,
       "authoritative_recall": 1.0,
       "cases": 1,
@@ -599,13 +653,13 @@
     "python": {
       "authoritative_precision": 1.0,
       "authoritative_recall": 0.9375,
-      "cases": 22,
+      "cases": 24,
       "context": {
         "accuracy": 1.0,
         "cases": 3,
         "correct": 3
       },
-      "disposition_accuracy": 0.9545,
+      "disposition_accuracy": 0.9583,
       "false_negative": 1,
       "false_positive": 0,
       "finding_identity": {
@@ -618,10 +672,10 @@
         "cases": 1,
         "correct": 1
       },
-      "true_negative": 6,
+      "true_negative": 8,
       "true_positive": 15,
-      "unresolved_rate": 0.0909,
-      "unsupported_rate": 0.0455
+      "unresolved_rate": 0.1667,
+      "unsupported_rate": 0.0417
     },
     "structured_config": {
       "authoritative_precision": 1.0,
@@ -765,13 +819,13 @@
       "relationship_pass": true
     },
     {
-      "actual": "authoritative",
+      "actual": "unresolved",
       "construct": "decorator",
       "context_applicable": false,
       "context_pass": true,
       "disposition_pass": true,
-      "expected": "authoritative",
-      "finding_identity_applicable": true,
+      "expected": "unresolved",
+      "finding_identity_applicable": false,
       "finding_identity_pass": true,
       "id": "py_tool_decorator",
       "known_limitation": false,
@@ -783,14 +837,48 @@
     },
     {
       "actual": "authoritative",
-      "construct": "retrieval",
+      "construct": "decorator_provenance",
       "context_applicable": false,
       "context_pass": true,
       "disposition_pass": true,
       "expected": "authoritative",
       "finding_identity_applicable": true,
       "finding_identity_pass": true,
+      "id": "py_tool_decorator_provenance",
+      "known_limitation": false,
+      "language": "python",
+      "mandatory": true,
+      "passed": true,
+      "relationship_applicable": false,
+      "relationship_pass": true
+    },
+    {
+      "actual": "unresolved",
+      "construct": "retrieval",
+      "context_applicable": false,
+      "context_pass": true,
+      "disposition_pass": true,
+      "expected": "unresolved",
+      "finding_identity_applicable": false,
+      "finding_identity_pass": true,
       "id": "py_rag_call",
+      "known_limitation": false,
+      "language": "python",
+      "mandatory": true,
+      "passed": true,
+      "relationship_applicable": false,
+      "relationship_pass": true
+    },
+    {
+      "actual": "authoritative",
+      "construct": "retrieval_provenance",
+      "context_applicable": false,
+      "context_pass": true,
+      "disposition_pass": true,
+      "expected": "authoritative",
+      "finding_identity_applicable": true,
+      "finding_identity_pass": true,
+      "id": "py_rag_call_provenance",
       "known_limitation": false,
       "language": "python",
       "mandatory": true,
@@ -1105,7 +1193,7 @@
       "relationship_pass": true
     }
   ],
-  "corpus_version": "2026.09.16-2",
+  "corpus_version": "2026.09.16-3",
   "known_mismatches": [
     "py_obfuscated_import"
   ],
@@ -1123,13 +1211,13 @@
   "overall": {
     "authoritative_precision": 1.0,
     "authoritative_recall": 0.9412,
-    "cases": 25,
+    "cases": 27,
     "context": {
       "accuracy": 1.0,
       "cases": 3,
       "correct": 3
     },
-    "disposition_accuracy": 0.96,
+    "disposition_accuracy": 0.963,
     "false_negative": 1,
     "false_positive": 0,
     "finding_identity": {
@@ -1142,10 +1230,10 @@
       "cases": 1,
       "correct": 1
     },
-    "true_negative": 8,
+    "true_negative": 10,
     "true_positive": 16,
-    "unresolved_rate": 0.08,
-    "unsupported_rate": 0.12
+    "unresolved_rate": 0.1481,
+    "unsupported_rate": 0.1111
   },
   "schema_version": "2.0"
 }

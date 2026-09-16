@@ -66,7 +66,7 @@ object elsewhere in the same document — no dangling references.
 | `controls` | Phase 4 | grouped by status, `NOT_DETECTED` always shown, never hidden |
 | `risks` | Phase 5 | severity distribution + deterministically sorted scenario list |
 | `readiness` | Phase 6 | all four level assessments + `blocked_from_next_level` |
-| `recommendations` | derived, see §7 | deduplicated, prioritized |
+| `recommendations` | derived, see §7 | deduplicated analyst-review actions; priority appears only with experimental scoring |
 | `limitations` | static + conditional | always present, never buried |
 
 ## 6. Risk vs readiness
@@ -80,7 +80,8 @@ versa; both numbers are simply presented.
 
 ## 7. Recommendations
 
-Generated from **existing** evidence only — no new detection. Priority order:
+Generated from **existing** evidence only — no new detection. The default report uses
+deterministic presentation order without assigning remediation priority:
 
 1. `CRITICAL`/`HIGH`/`MODERATE` risk scenarios (already deterministically sorted by
    Phase 5 severity → score → category → risk_id)
@@ -93,9 +94,10 @@ Deduplication: a control referenced by `related_control_ids` on any risk-scenari
 recommendation is never also given its own standalone recommendation — verified by
 `test_dedup_control_not_double_recommended_with_its_risk` (C05's gap in
 `agent-with-tools` is covered by the `TOOL_SECURITY`/`HIGH_IMPACT_ACTION` risk
-recommendations, so no separate "C05 not detected" line is added). Priorities are
-assigned sequentially (`P0`, `P1`, …) over the final merged, sorted list — not
-hardcoded per category.
+recommendations, so no separate "C05 not detected" line is added). Sequential
+`P0`, `P1`, … labels are retained only in explicitly enabled, uncalibrated
+`--experimental-scoring` output. Default actions require analyst review, and actions
+whose downstream reachability is not established use conditional wording.
 
 ## 8. No-AI behavior
 
@@ -166,10 +168,10 @@ Level 2  MANAGED      BLOCKED
          └─ no repeatable AI/security test artifact detected...
 
 ────────────────────────────────────────
-RECOMMENDED ACTIONS
+ANALYST REVIEW ACTIONS
 
-P0  AI-connected high-impact action ... without detected authorization control
-P1  AI-connected tool execution without detected authorization control
+- AI-connected high-impact action ... without detected authorization control
+- AI-connected tool execution without detected authorization control
 
 ────────────────────────────────────────
 ASSESSMENT LIMITATIONS

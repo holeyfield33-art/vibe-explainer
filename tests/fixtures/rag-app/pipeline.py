@@ -1,9 +1,8 @@
 import anthropic
-import chromadb
+from langchain_chroma import Chroma
 
 client = anthropic.Anthropic()
-chroma_client = chromadb.Client()
-collection = chroma_client.get_or_create_collection("docs")
+collection = Chroma(collection_name="docs")
 
 
 def answer(query: str) -> str:

@@ -94,6 +94,30 @@ class TestValidationCorpus(unittest.TestCase):
         self.assertEqual(case["expected"], "unsupported")
         self.assertTrue(next(r for r in self.report["cases"] if r["id"] == case["id"])["passed"])
 
+    def test_bare_tool_decorator_is_unresolved(self):
+        row = next(r for r in self.report["cases"] if r["id"] == "py_tool_decorator")
+        self.assertEqual((row["expected"], row["actual"]), ("unresolved", "unresolved"))
+
+    def test_provenance_backed_tool_decorator_is_authoritative(self):
+        row = next(
+            r for r in self.report["cases"]
+            if r["id"] == "py_tool_decorator_provenance"
+        )
+        self.assertEqual((row["expected"], row["actual"]), ("authoritative", "authoritative"))
+        self.assertTrue(row["finding_identity_pass"])
+
+    def test_unbound_similarity_search_is_unresolved(self):
+        row = next(r for r in self.report["cases"] if r["id"] == "py_rag_call")
+        self.assertEqual((row["expected"], row["actual"]), ("unresolved", "unresolved"))
+
+    def test_provenance_backed_retrieval_is_authoritative(self):
+        row = next(
+            r for r in self.report["cases"]
+            if r["id"] == "py_rag_call_provenance"
+        )
+        self.assertEqual((row["expected"], row["actual"]), ("authoritative", "authoritative"))
+        self.assertTrue(row["finding_identity_pass"])
+
     def test_obfuscated_import_remains_false_negative_until_supported(self):
         row = next(r for r in self.report["cases"] if r["id"] == "py_obfuscated_import")
         self.assertEqual((row["expected"], row["actual"]), ("authoritative", "none"))

@@ -314,16 +314,24 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
     add("---")
     add("")
 
-    # ---- Top remediations -------------------------------------------------
-    add("## Top Remediations")
+    # ---- Analyst review actions ------------------------------------------
+    add("## Top Remediations" if experimental else "## Analyst Review Actions")
     add("")
     if report.recommendations:
         for rec in report.recommendations:
-            add(f"### {rec['priority']} — {rec['title']}")
+            heading = (
+                f"{rec['priority']} — {rec['title']}"
+                if experimental else rec["title"]
+            )
+            add(f"### {heading}")
             add("")
-            add(f"**Why it matters:** {rec['why_it_matters']}")
+            add(f"**Evidence basis:** {rec['why_it_matters']}")
             add("")
-            add(f"**Suggested action:** {rec['suggested_action']}")
+            action_label = "Suggested action" if experimental else "Candidate action"
+            add(f"**{action_label}:** {rec['suggested_action']}")
+            add("")
+            if not experimental:
+                add("**Requires analyst review:** Yes.")
             add("")
             refs = []
             if rec["related_risk_ids"]:
@@ -334,7 +342,7 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
                 add(f"*Traces to: {'; '.join(refs)}.*")
                 add("")
     else:
-        add("No remediations were generated.")
+        add("No candidate analyst-review actions were generated.")
         add("")
     add("---")
     add("")

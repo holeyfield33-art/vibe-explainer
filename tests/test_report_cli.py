@@ -185,12 +185,25 @@ class TestRecommendations(unittest.TestCase):
     def test_recommendations_generated_for_high_risk(self):
         report = _report("agent-with-tools")
         self.assertTrue(report.recommendations)
-        self.assertEqual(report.recommendations[0]["priority"], "P0")
+        self.assertNotIn("priority", report.recommendations[0])
+        self.assertTrue(report.recommendations[0]["requires_analyst_review"])
 
-    def test_priorities_sequential(self):
+    def test_priorities_are_experimental_only(self):
         report = _report("agent-with-tools")
-        priorities = [r["priority"] for r in report.recommendations]
+        self.assertTrue(all("priority" not in r for r in report.recommendations))
+        experimental = _report("agent-with-tools", experimental=True)
+        priorities = [r["priority"] for r in experimental.recommendations]
         self.assertEqual(priorities, [f"P{i}" for i in range(len(priorities))])
+
+    def test_unestablished_reachability_uses_conditional_recommendation(self):
+        report = _report("basic-chatbot")
+        recommendation = next(
+            r for r in report.recommendations
+            if r["reachability_status"] == "NOT_ESTABLISHED"
+            and r["related_risk_ids"]
+            and "output" in r["title"].lower()
+        )
+        self.assertTrue(recommendation["suggested_action"].startswith("If model output"))
 
     def test_no_recommendations_for_well_controlled(self):
         report = _report("controls-well-controlled")

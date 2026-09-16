@@ -374,6 +374,71 @@ def _python_syntax(text: str) -> _PythonSyntax:
     )
 
 
+_SUPPORTED_TOOL_IMPORTS = frozenset({
+    "langchain.tools",
+    "langchain_core.tools",
+})
+_SUPPORTED_RETRIEVER_IMPORTS = frozenset({
+    "langchain_chroma",
+})
+
+
+def _python_symbol_provenance(text: str) -> tuple[set[str], dict[str, str]]:
+    """Return supported tool names and provenance-backed retriever instances.
+
+    These deliberately bounded facts prevent a generic ``@tool`` decorator or
+    ``obj.similarity_search()`` method from becoming authoritative merely because
+    its spelling resembles an AI framework API.
+    """
+    try:
+        tree = ast.parse(text)
+    except (SyntaxError, ValueError):
+        return set(), {}
+
+    tool_names: set[str] = set()
+    retriever_constructors: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom) or not node.module:
+            continue
+        if node.module in _SUPPORTED_TOOL_IMPORTS:
+            for alias in node.names:
+                if alias.name in {"tool", "function_tool"}:
+                    tool_names.add(alias.asname or alias.name)
+        if node.module in _SUPPORTED_RETRIEVER_IMPORTS:
+            for alias in node.names:
+                if alias.name == "Chroma":
+                    retriever_constructors.add(alias.asname or alias.name)
+
+    retriever_instances: dict[str, str] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+            continue
+        value = node.value
+        if not isinstance(value, ast.Call) or not isinstance(value.func, ast.Name):
+            continue
+        if value.func.id not in retriever_constructors:
+            continue
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+        for target in targets:
+            if isinstance(target, ast.Name):
+                retriever_instances[target.id] = value.func.id
+    return tool_names, retriever_instances
+
+
+def _has_supported_symbol_provenance(
+    text: str, match_start: int, name: str
+) -> bool:
+    tool_names, retriever_instances = _python_symbol_provenance(text)
+    before = text[:match_start]
+    if name == "Tool/function decorator":
+        match = re.match(r"@([A-Za-z_]\w*)", text[match_start:])
+        return bool(match and match.group(1) in tool_names)
+    if name == "Vector store / retriever" and text.startswith("similarity_search", match_start):
+        receiver = re.search(r"([A-Za-z_]\w*)\.\s*$", before)
+        return bool(receiver and receiver.group(1) in retriever_instances)
+    return True
+
+
 def _classify_match_basis(
     suffix: str, syntax: _PythonSyntax | None, text: str, match_start: int, name: str
 ) -> tuple[str, bool] | None:
@@ -400,6 +465,10 @@ def _classify_match_basis(
         return None
     if in_string and name not in _PY_STRING_ALLOWED_NAMES:
         return None
+    if name in {"Tool/function decorator", "Vector store / retriever"} and not (
+        _has_supported_symbol_provenance(text, match_start, name)
+    ):
+        return "UNRESOLVED_SYMBOL", False
     return "PYTHON_AST", True
 
 

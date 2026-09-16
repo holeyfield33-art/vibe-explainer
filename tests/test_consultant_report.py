@@ -40,7 +40,7 @@ class TestConsultantReportStructure(unittest.TestCase):
             "## Concern Scenarios",
             "## Security Controls",
             "## Process-Evidence Checklist",
-            "## Top Remediations",
+            "## Analyst Review Actions",
             "## Evidence Appendix",
             "## Limitations",
         ):
@@ -72,6 +72,13 @@ class TestConsultantReportContent(unittest.TestCase):
         self.assertIn("enforcement, and effectiveness remain **UNKNOWN**", md)
         self.assertNotIn("**Score:**", md)
         self.assertNotIn("Level 1 — Baseline", md)
+
+    def test_default_report_contains_no_p0_p1_p2_priorities(self):
+        md = _md("agent-with-tools", assessment_date="2026-01-01")
+        self.assertNotIn("## Top Remediations", md)
+        self.assertNotRegex(md, r"(?m)^### P[012]\b")
+        self.assertIn("## Analyst Review Actions", md)
+        self.assertIn("**Requires analyst review:** Yes.", md)
 
     def test_forbidden_assurance_language_absent(self):
         md = _md("agent-with-tools", assessment_date="2026-01-01").lower()

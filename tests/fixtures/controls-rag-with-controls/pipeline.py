@@ -1,11 +1,10 @@
 import anthropic
-import chromadb
+from langchain_chroma import Chroma
 
 ALLOWED_SOURCES = {"internal-docs", "verified-kb"}
 
 client = anthropic.Anthropic()
-chroma_client = chromadb.Client()
-collection = chroma_client.get_or_create_collection("docs")
+collection = Chroma(collection_name="docs")
 
 
 def verify_source(doc) -> bool:

@@ -53,7 +53,9 @@ class TestRAGToModel(unittest.TestCase):
         discovery = discover_ai(FIXTURES / "rag-app")
         graph = build_dataflow(discovery)
         retrieved = _edges(graph, "retrieved_context")
-        self.assertEqual(len(retrieved), 1)
+        # Both the provenance-backed Chroma construction and its retrieval call
+        # are authoritative retrieval evidence connected to the model use.
+        self.assertEqual(len(retrieved), 2)
         edge = retrieved[0]
         self.assertEqual(edge.source_type, "rag_retrieval")
         self.assertEqual(edge.destination_type, "ai_usage")

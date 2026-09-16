@@ -1,5 +1,6 @@
 import subprocess
 
+from langchain_core.tools import tool
 from openai import OpenAI
 
 client = OpenAI()

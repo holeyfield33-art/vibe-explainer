@@ -98,9 +98,25 @@ class TestReleaseOutputAndProvenance(unittest.TestCase):
         self.assertFalse(payload["metadata"]["experimental_scoring_enabled"])
         self.assertNotIn("highest_risk_severity", payload["executive_summary"])
         self.assertNotIn("readiness_level", payload["executive_summary"])
+        self.assertTrue(all("priority" not in item for item in payload["recommendations"]))
         for output in (terminal.stdout, markdown.stdout):
             self.assertNotIn("Risk score:", output)
             self.assertNotIn("Readiness Level", output)
+            self.assertNotRegex(output, r"(?m)^P[012]\s")
+        self.assertIn("ANALYST REVIEW ACTIONS", terminal.stdout)
+        self.assertIn("## Analyst Review Actions", markdown.stdout)
+
+    def test_regenerated_golden_report_matches_current_product_boundary(self):
+        golden = (
+            ROOT / "examples" / "sample-assessment" / "synthetic-ai-review.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("## Analyst Review Actions", golden)
+        self.assertNotIn("## Top Remediations", golden)
+        self.assertNotRegex(golden, r"(?m)^### P[012]\b")
+        self.assertIn("If model output is consumed", golden)
+        self.assertNotIn("**Score:**", golden)
+        self.assertIn("## Assessment Provenance", golden)
+        self.assertIn("## Limitations", golden)
 
     def test_manifest_is_derived_and_complete(self):
         result = self._run(str(FIXTURES / "basic-chatbot"), "--json")
