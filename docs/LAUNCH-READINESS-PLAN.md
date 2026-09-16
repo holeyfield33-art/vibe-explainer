@@ -56,7 +56,7 @@ the launch gates at the end of this document pass.
   Verify: positive and negative prompt-to-model, retrieval-to-model, model-to-tool, sink,
   and two-file import fixtures.
 
-- [ ] **6. Make control evidence structural**
+- [x] **6. Make control evidence structural**
   Issue refs: `#7`
   What to build: Separate artifact presence, structural enforcement, and effectiveness
   not verified. Require same-function or resolved-call relationships and consumption of
@@ -65,7 +65,7 @@ the launch gates at the end of this document pass.
   documentation headers cannot establish enforcement.
   Verify: adversarial negative cases for all twelve controls.
 
-- [ ] **7. Minimize and govern captured evidence**
+- [x] **7. Minimize and govern captured evidence**
   Issue refs: `#13`
   What to build: Store minimal sanitized match excerpts, maintain positive/benign secret
   corpora, unify report/error redaction boundaries, and document retention and handling.
@@ -82,7 +82,7 @@ the launch gates at the end of this document pass.
   rates reproduce offline and appear in release notes.
   Verify: one documented metrics command reproduces the checked-in release artifact.
 
-- [ ] **9. Add packaging, provenance, and safe output**
+- [x] **9. Add packaging, provenance, and safe output**
   Issue refs: `#10`
   What to build: Add PEP 621 packaging and console entry point, one version source, schema
   compatibility policy, atomic non-overwriting writes, output exclusion, and stable evidence
