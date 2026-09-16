@@ -33,10 +33,10 @@ _LEVEL_ORDER = (1, 2, 3, 4)
 _NOTABLE_CONTROLS = {"C05", "C08", "C09", "C10", "C12"}
 
 _STANDARD_LIMITATIONS = [
-    "Static analysis only — general discovery is primarily lexical, with targeted syntax "
-    "inspection for Python imports and security-test assertions; there is no control-flow graph.",
-    "Relationship observations use bounded same-file and import-resolution heuristics; they "
-    "do not establish runtime data flow.",
+    "Static analysis only — authoritative source discovery is syntax-gated for Python and "
+    "lexical for structured configuration; other code languages are lead-only.",
+    "Relationship observations require bounded Python def-use or direct-import evidence; "
+    "they do not establish runtime data flow.",
     "No runtime verification of any kind — nothing in this pipeline executes the "
     "target application or confirms a path is actually reachable.",
     "Control discovery begins with named patterns and uses conservative Python AST relationships; "
@@ -86,6 +86,7 @@ class VibeExplainerReport:
     def to_dict(self) -> dict[str, Any]:
         return redact_structure({
             "metadata": self.metadata,
+            "assessment_manifest": assessment_manifest(self.metadata),
             "executive_summary": self.executive_summary,
             "ai_inventory": self.ai_inventory,
             "attack_surface": self.attack_surface,
@@ -101,6 +102,31 @@ class VibeExplainerReport:
     def to_json(self) -> str:
         """Deterministic, ANSI-free JSON serialization of the complete report."""
         return json.dumps(self.to_dict(), indent=2, sort_keys=False, ensure_ascii=False)
+
+
+def assessment_manifest(metadata: dict[str, Any]) -> dict[str, Any]:
+    """Derive the reproducibility manifest from report metadata without a second truth source."""
+    revision = metadata.get("repository_revision") or {}
+    scan_configuration = metadata.get("scan_configuration") or {}
+    asi_catalog = metadata.get("asi_catalog") or {}
+    return {
+        "engine": "vibe-explainer",
+        "engine_version": metadata.get("version"),
+        "schema_version": metadata.get("schema_version"),
+        "repository_revision": {
+            "commit": revision.get("commit"),
+            "branch": revision.get("branch"),
+            "dirty": revision.get("dirty"),
+            "available": bool(revision.get("available", False)),
+        },
+        "assessment_completeness": metadata.get("assessment_completeness"),
+        "scan_configuration": scan_configuration,
+        "asi_catalog": {
+            "supplied": bool(asi_catalog.get("supplied", False)),
+            "source_hash": asi_catalog.get("source_hash"),
+            "version": asi_catalog.get("version"),
+        },
+    }
 
 
 def build_report(
@@ -130,6 +156,18 @@ def build_report(
         "repository_path": discovery.root,
         "assessment_completeness": readiness.assessment_completeness,
         "experimental_scoring_enabled": include_experimental_scoring,
+        "repository_revision": {
+            "commit": None,
+            "branch": None,
+            "dirty": None,
+            "available": False,
+        },
+        "scan_configuration": {
+            "excluded_paths": [],
+            "experimental_scoring": include_experimental_scoring,
+            "asi_catalog_supplied": False,
+        },
+        "asi_catalog": {"supplied": False, "source_hash": None, "version": None},
     }
 
     ai_surface_detected = discovery.has_ai_signal()

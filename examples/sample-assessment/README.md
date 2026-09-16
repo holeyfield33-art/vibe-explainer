@@ -1,14 +1,14 @@
 # Sample assessment
 
-`aletheia-core-assessment.md` is a real, unedited consultant-grade report produced by:
+`synthetic-ai-review.md` is generated from the synthetic fixture in
+`examples/analyst-review-fixture` using the current default evidence-review behavior:
 
 ```bash
-python -m vibe_explainer /path/to/repo --security --consultant -o assessment.md
+python -m vibe_explainer examples/analyst-review-fixture --report -o examples/sample-assessment/synthetic-ai-review.md
 ```
 
-It is included as an example of the deliverable format — the section structure, the
-playbook-aligned risk scoring and readiness levels, the production-vs-test context
-separation, and the evidence chain (every conclusion traces to a finding, data-flow, or
-control ID). It is not a security endorsement or criticism of any repository; it is a
-static, evidence-based snapshot of what the code demonstrates, with its limitations
-stated in the report itself.
+The fixture is invented and contains no customer information or real credentials. The
+report demonstrates analyst-reviewable evidence, completeness, provenance, and explicit
+limitations. It is not a penetration test and does not prove exploitability, runtime
+behavior, or control effectiveness. Default output contains no numeric vulnerability
+score, severity award, or awarded readiness/maturity level.

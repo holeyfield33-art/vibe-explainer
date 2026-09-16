@@ -12,11 +12,13 @@ uses pre-release versioning while its security evidence model is being hardened.
   readiness, data-flow, or ASI conclusions. Reports now publish supported constructs,
   evidence basis, conclusion eligibility, and unresolved parse/static cases.
 - Add a versioned adversarial detection corpus and deterministic offline metric runner.
-  Provisional corpus v2026.09.15-1 reports 100% precision and 94.12% recall overall
-  (100% precision and 93.75% recall for Python),
-  with unsupported and unresolved rates published per language and construct. Labels
-  remain explicitly pending independent review, and the known obfuscated-import miss is
-  retained as a false negative.
+  Provisional corpus v2026.09.16-2 reports authoritative precision/recall plus separate
+  disposition, finding-identity, context, and relationship accuracy, with unsupported
+  and unresolved rates per language and construct. Labels remain explicitly pending
+  independent review, and the known obfuscated-import miss is retained as a false negative.
+- Correct package licensing to Apache-2.0, move unreleased development to `0.2.0a1`,
+  pin GitHub Actions to immutable commits, add a product-boundary checker, and provide
+  one offline release-qualification command with build/install/output/package checks.
 
 - Replace nearest-line data-flow edges with bounded Python AST def-use, direct imported
   symbol, and direct imported-call relationships. Proximity-only candidates are retained

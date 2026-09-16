@@ -59,7 +59,7 @@ _EXAMPLE_PATH = re.compile(r"(?i)(^|/)(examples?|samples?)(/|$)")
 _DEMO_PATH = re.compile(r"(?i)(^|/)demos?(/|$)|(^|/)demo[_-]|[_-]demo\.[a-z0-9]+$")
 _DOC_PATH = re.compile(r"(?i)(^|/)docs?(/|$)")
 _GENERATED_PATH = re.compile(
-    r"(?i)(^|/)(dist|build|out|coverage|node_modules|vendor|\.next|target)(/|$)"
+    r"(?i)(^|/)(dist|build|out|coverage|generated|node_modules|vendor|\.next|target)(/|$)"
     r"|(^|/)charts?(/|$)"
     r"|(^|/)[^/]*(manifest|graph-ts|graph)\.json$"
     r"|(^|/)[^/]+\.(lock|min\.js|generated\.[a-z0-9]+)$"

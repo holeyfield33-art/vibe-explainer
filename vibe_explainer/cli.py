@@ -262,6 +262,11 @@ def _run_security_mode(
             report.metadata["scan_configuration"]["asi_catalog_sha256"] = (
                 asi_matrix.get("catalog", {}).get("source_hash")
             )
+            report.metadata["asi_catalog"] = {
+                "supplied": True,
+                "source_hash": asi_matrix.get("catalog", {}).get("source_hash"),
+                "version": asi_matrix.get("catalog", {}).get("version"),
+            }
     except Exception as exc:  # noqa: BLE001 — surface cleanly, never a raw traceback
         print(redact_secrets(f"Unable to analyze repository:\n{exc}"), file=sys.stderr)
         return 1

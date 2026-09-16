@@ -1,5 +1,7 @@
 # Vibe Explainer
 
+License: Apache-2.0.
+
 Vibe Explainer is an offline static AI repository evidence reviewer. It inventories
 AI-related source signals, organizes attack-surface leads, records inferred relationships,
 looks for security-control artifacts, and produces traceable JSON, terminal, or Markdown
@@ -114,7 +116,7 @@ The complete release gate and implementation order are in
 python -m pytest
 python -m coverage run -m pytest
 python -m coverage report --fail-under=90
-python -m vibe_explainer.validation --output validation/metrics.json --check
+python -m vibe_explainer.validation --output validation/metrics.json --metrics-gate --check
 git diff --exit-code -- validation/metrics.json
 ```
 

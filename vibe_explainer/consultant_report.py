@@ -50,6 +50,22 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         "leads, inferred relationships, control artifacts, concern scenarios, and process "
         "signals. Does not include runtime testing or adversarial validation.")
     add(f"- **Assessment completeness:** {m['assessment_completeness']}")
+    revision = m.get("repository_revision") or {}
+    add(f"- **Repository revision available:** {str(bool(revision.get('available'))).lower()}")
+    add(f"- **Repository commit:** `{revision.get('commit') or 'not available'}`")
+    add(f"- **Repository branch:** `{revision.get('branch') or 'not available'}`")
+    dirty = revision.get("dirty")
+    add(f"- **Repository dirty state:** {dirty if dirty is not None else 'not available'}")
+    scan_configuration = m.get("scan_configuration") or {}
+    exclusions = scan_configuration.get("excluded_paths") or []
+    add(f"- **Scan exclusions:** {', '.join(exclusions) if exclusions else 'none'}")
+    add(f"- **Experimental scoring:** {str(bool(m.get('experimental_scoring_enabled'))).lower()}")
+    asi_catalog = m.get("asi_catalog") or {}
+    add(f"- **ASI catalog:** " + (
+        f"{asi_catalog.get('version') or 'version unavailable'}; "
+        f"hash `{asi_catalog.get('source_hash') or 'not available'}`"
+        if asi_catalog.get("supplied") else "not supplied"
+    ))
     add("")
     add("---")
     add("")

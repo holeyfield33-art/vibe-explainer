@@ -1,10 +1,11 @@
 {
-  "version": "2026.09.15-1",
+  "version": "2026.09.16-2",
   "label_review": {
     "status": "PENDING_INDEPENDENT_REVIEW",
     "labeler": "implementation team",
     "required_reviewer": "independent reviewer who did not implement the detector",
-    "note": "Metrics are provisional until the checked-in labels receive independent review."
+    "reviewed_version": null,
+    "review_notes": null
   },
   "cases": [
     {
@@ -13,7 +14,8 @@
       "construct": "import",
       "path": "app.py",
       "source": "from openai import OpenAI\nclient = OpenAI()\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_aliased_import",
@@ -21,7 +23,8 @@
       "construct": "alias",
       "path": "app.py",
       "source": "from openai import OpenAI as Client\nclient = Client()\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_wrapper",
@@ -29,7 +32,8 @@
       "construct": "wrapper",
       "path": "client.py",
       "source": "import openai as provider\ndef build_client():\n    return provider.OpenAI()\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_chat_call",
@@ -37,7 +41,8 @@
       "construct": "call",
       "path": "chat.py",
       "source": "response = client.chat.completions.create(model=\"gpt-4o\", messages=[])\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "ai_usage", "name": "Chat/completions call", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_prompt_assignment",
@@ -45,7 +50,8 @@
       "construct": "assignment",
       "path": "prompt.py",
       "source": "SYSTEM_PROMPT = \"Be concise\"\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "prompt_surface", "name": "System prompt variable", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_tool_decorator",
@@ -53,7 +59,8 @@
       "construct": "decorator",
       "path": "tools.py",
       "source": "@tool\ndef lookup(query: str):\n    return query\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "tool_agent", "name": "Tool/function decorator", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_rag_call",
@@ -61,7 +68,8 @@
       "construct": "retrieval",
       "path": "rag.py",
       "source": "docs = store.similarity_search(query)\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "rag_retrieval", "name": "Vector store / retriever", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_mcp_server",
@@ -69,7 +77,8 @@
       "construct": "framework",
       "path": "server.py",
       "source": "from mcp.server.fastmcp import FastMCP\nserver = FastMCP(\"demo\")\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "mcp", "name": "FastMCP server", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_langchain_variant",
@@ -77,7 +86,8 @@
       "construct": "framework",
       "path": "chain.py",
       "source": "from langchain.agents import create_agent\nagent = create_agent(model, tools=[])\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "ai_usage", "name": "LangChain", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "py_comment_signature",
@@ -125,7 +135,10 @@
       "construct": "obfuscation",
       "path": "hidden.py",
       "source": "provider = __import__(\"op\" + \"enai\")\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "mandatory": false,
+      "known_limitation": true,
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "ts_vercel_sdk",
@@ -149,7 +162,8 @@
       "construct": "configuration",
       "path": ".env",
       "source": "OPENAI_API_KEY=replace-me\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [{"category": "secret_config", "name": "Model API key env var", "evidence_basis": "CONFIG_ARTIFACT"}]
     },
     {
       "id": "generated_context",
@@ -157,7 +171,9 @@
       "construct": "generated_context",
       "path": "generated/client.py",
       "source": "from openai import OpenAI\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_context": "GENERATED",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "test_context",
@@ -165,7 +181,9 @@
       "construct": "test_context",
       "path": "tests/test_client.py",
       "source": "from openai import OpenAI\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_context": "TEST",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "example_context",
@@ -173,7 +191,9 @@
       "construct": "example_context",
       "path": "examples/demo.py",
       "source": "from anthropic import Anthropic\nclient = Anthropic()\n",
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_context": "EXAMPLE",
+      "expected_findings": [{"category": "model_provider", "name": "Anthropic", "evidence_basis": "PYTHON_AST"}]
     },
     {
       "id": "multi_file_import",
@@ -182,10 +202,20 @@
       "path": "unused.py",
       "source": "",
       "files": [
-        {"path": "provider.py", "source": "from openai import OpenAI\nclient = OpenAI()\n"},
-        {"path": "app.py", "source": "from provider import client\nresult = client.chat.completions.create(model='gpt-4o', messages=[])\n"}
+        {"path": "provider.py", "source": "SYSTEM_PROMPT = 'Be concise'\n"},
+        {"path": "app.py", "source": "from provider import SYSTEM_PROMPT\nresult = client.chat.completions.create(model='gpt-4o', messages=[{'role': 'system', 'content': SYSTEM_PROMPT}])\n"}
       ],
-      "expected": "authoritative"
+      "expected": "authoritative",
+      "expected_findings": [
+        {"category": "prompt_surface", "name": "System prompt variable", "evidence_basis": "PYTHON_AST"},
+        {"category": "ai_usage", "name": "Chat/completions call", "evidence_basis": "PYTHON_AST"}
+      ],
+      "expected_relationships": [{
+        "source_file": "provider.py",
+        "destination_file": "app.py",
+        "relationship": "feeds_prompt",
+        "resolution_method": "PYTHON_IMPORT_SYMBOL"
+      }]
     },
     {
       "id": "plain_python",
@@ -202,12 +232,13 @@
       "path": "example.py",
       "source": "from openai import OpenAI\nclient = OpenAI()\nresponse = client.responses.create(model=\"gpt-5.2\", input=\"Hello\")\n",
       "expected": "authoritative",
+      "expected_findings": [{"category": "model_provider", "name": "OpenAI", "evidence_basis": "PYTHON_AST"}],
       "provenance": {
         "repository": "https://github.com/openai/openai-python",
         "commit": "98e1d24f4902ab58830adf0e2b6a729a5d5429b1",
         "source_path": "README.md",
         "license": "Apache-2.0",
-        "adaptation": "Credential-free minimal excerpt adapted for static analysis."
+        "adaptation": "API-shape-preserving minimal adaptation from the pinned upstream README example. Credentials, model identifier, token count, message payload, and unrelated lines may be simplified for deterministic static-analysis testing."
       }
     },
     {
@@ -217,12 +248,13 @@
       "path": "example.py",
       "source": "import os\nfrom anthropic import Anthropic\nclient = Anthropic(api_key=os.environ.get(\"ANTHROPIC_API_KEY\"))\nmessage = client.messages.create(model=\"claude-opus-4-6\", max_tokens=32, messages=[])\n",
       "expected": "authoritative",
+      "expected_findings": [{"category": "model_provider", "name": "Anthropic", "evidence_basis": "PYTHON_AST"}],
       "provenance": {
         "repository": "https://github.com/anthropics/anthropic-sdk-python",
         "commit": "7e5ca5c94126a6d7de159a169ff43eb9b1cac57f",
         "source_path": "README.md",
         "license": "MIT",
-        "adaptation": "Credential-free minimal excerpt adapted for static analysis."
+        "adaptation": "API-shape-preserving minimal adaptation from the pinned upstream README example. Credentials, model identifier, token count, message payload, and unrelated lines may be simplified for deterministic static-analysis testing."
       }
     }
   ]

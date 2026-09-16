@@ -7,13 +7,14 @@ lead, unresolved static evidence, or no signal.
 Reproduce the published artifact offline from the repository root:
 
 ```bash
-python -m vibe_explainer.validation --output validation/metrics.json --check
+python -m vibe_explainer.validation --output validation/metrics.json --metrics-gate --check
 git diff --exit-code -- validation/metrics.json
 ```
 
-`--check` enforces the issue #4 launch threshold of at least 90% Python precision. It
-does not require perfect recall: missed and unresolved cases remain visible in the
-artifact instead of being silently removed.
+`--metrics-gate` enforces the documented threshold of at least 90% Python authoritative
+precision. `--check` separately fails on mandatory disposition, finding-identity,
+context, or relationship mismatches. Known, non-mandatory limitations remain visible
+as false negatives and are printed even when both gates pass.
 
 The corpus contains synthetic adversarial cases plus credential-free adaptations of
 examples from pinned, permissively licensed SDK repositories. Each external case records
@@ -33,5 +34,6 @@ An independent reviewer should:
    `label_review`; set its status to `INDEPENDENTLY_REVIEWED`.
 4. Re-run the command above and commit any label, detector, and metric changes together.
 
-The known obfuscated-import miss is intentionally labelled positive. Its false-negative
-result is published, preserving an honest recall boundary.
+The known obfuscated-import miss is intentionally labelled positive and non-mandatory
+under the current release policy. Its false-negative result is published, preserving
+an honest recall boundary. See [the labeling policy](../validation/LABELING.md).

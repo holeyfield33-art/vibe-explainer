@@ -13,7 +13,7 @@ the launch gates at the end of this document pass.
   claims with evidence-review language.
   Acceptance: README, SPEC, CLI help, JSON, terminal output, and Markdown describe the
   same supported capabilities and non-capabilities.
-  Verify: `rg -n "consultant-grade|industry-standard|certif|prove|guarantee|maturity" README.md SPEC.md vibe_explainer docs`
+  Verify: `python scripts/check_product_boundary.py`
 
 - [x] **2. Suspend uncalibrated scores and readiness awards by default**
   Issue refs: `#6`, `#8`

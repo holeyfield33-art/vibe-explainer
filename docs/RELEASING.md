@@ -13,6 +13,21 @@ Before a release:
    `vibe-explainer --version`, and uninstall it.
 5. Require green Python and CodeQL workflows on the exact release commit.
 
+The historical `v0.1.0` tag represents the initial scored/readiness-oriented behavior
+and must not be moved or rewritten. The `0.2.x` line establishes the narrowed,
+analyst-reviewed evidence boundary: default scoring and readiness awards are removed,
+control semantics and Python discovery are structural, relationships require bounded
+AST evidence, report schema 2.0 is in use, and ASI mapping has independent evidence axes.
+
+Run the complete local qualification with:
+
+```bash
+python scripts/qualify_release.py
+```
+
+The local command does not replace green CI, CodeQL, branch protection, independent
+corpus-label review, or manual analyst review of the golden report.
+
 Report schema versions are independent from package versions. Additive fields may ship
 within the same major schema. Renaming/removing a field, changing serialized enum
 values, or changing evidence identity semantics requires a schema-major increment and
