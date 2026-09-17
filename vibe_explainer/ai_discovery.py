@@ -732,6 +732,8 @@ def _resolve_internal_imports(file_texts: dict[str, str]) -> dict[str, list[str]
     index = build_symbol_index(pairs)
     out: dict[str, list[str]] = {}
     for rel, _text in pairs:
+        if not within_budget():
+            break
         info = index.modules.get(rel)
         if info is None:
             continue

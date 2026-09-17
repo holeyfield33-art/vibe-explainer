@@ -104,8 +104,8 @@ def main() -> int:
         f"commit {commit.stdout.strip() or 'unavailable'}; version {runtime_version.stdout.strip() or 'unavailable'}",
     )
     q.command("product-boundary check", [sys.executable, "scripts/check_product_boundary.py"])
-    q.command("pytest", [sys.executable, "-m", "pytest", "-q"])
-    q.command("branch coverage run", [sys.executable, "-m", "coverage", "run", "-m", "pytest", "-q"])
+    q.command("pytest", [sys.executable, "-m", "pytest", "-q", "-ra"])
+    q.command("branch coverage run", [sys.executable, "-m", "coverage", "run", "-m", "pytest", "-q", "-ra"])
     q.command("branch coverage >= 90%", [sys.executable, "-m", "coverage", "report", "--fail-under=90"])
     q.command("frozen detection review", [sys.executable, "scripts/review_detection.py"])
     q.command("golden report regression", [sys.executable, "scripts/golden_report.py"])

@@ -9,7 +9,7 @@
 - **Assessment completeness:** COMPLETE
 - **Elapsed analysis seconds:** measured at runtime; omitted from golden comparison
 - **Files discovered / inspected / skipped:** 4 / 4 / 0
-- **Bytes inspected:** 2160
+- **Bytes inspected:** measured at runtime; line-ending dependent
 - **Budget termination:** none
 - **Applied exclusions:** none
 - **Parse failures:** none

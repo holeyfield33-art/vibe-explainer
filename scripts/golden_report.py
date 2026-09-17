@@ -38,6 +38,7 @@ def render() -> str:
     report.metadata["repository_path"] = "examples/analyst-review-fixture"
     report.metadata["repository_revision"] = {"commit": None, "branch": None, "dirty": None, "available": False}
     report.metadata["scan_scope"]["elapsed_seconds"] = "measured at runtime; omitted from golden comparison"
+    report.metadata["scan_scope"]["bytes_inspected"] = "measured at runtime; line-ending dependent"
     report.metadata["scan_configuration"]["fixture_sha256"] = fixture_hash()
     return render_consultant_markdown(report, assessment_date="2026-09-17") + "\n\nFixture SHA-256: `" + fixture_hash() + "`\n"
 

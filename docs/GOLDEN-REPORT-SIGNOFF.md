@@ -5,7 +5,7 @@ Status: PENDING_ANALYST_APPROVAL
 Candidate: [beta-golden.md](../examples/sample-assessment/beta-golden.md).
 Fixture: `examples/analyst-review-fixture`; its canonical content SHA-256 is
 printed in the candidate. `python scripts/golden_report.py` compares the entire
-Markdown output, with only elapsed time, local path, date and Git identity
+Markdown output, with only elapsed time, raw byte count (line-ending dependent), local path, date and Git identity
 normalized. Fixture content identity is retained; unavailable Git identity is
 explicit, never fabricated. Runtime reports contain actual revision metadata.
 
