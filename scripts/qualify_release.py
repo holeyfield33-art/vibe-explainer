@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import argparse
+import hashlib
 import os
 import subprocess
 import sys
@@ -35,6 +37,8 @@ class Qualification:
         passed = result.returncode == expect
         detail = "ok" if passed else f"exit {result.returncode}; {result.stderr.strip()[-500:]}"
         self.record(name, passed, detail)
+        if name in {"pytest", "branch coverage run", "branch coverage >= 90%"}:
+            print(result.stdout.strip()[-1500:], flush=True)
         return result
 
     def finish(self) -> int:
@@ -85,6 +89,10 @@ def _cli_in(venv_root: Path) -> Path:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--large-targets", type=Path)
+    parser.add_argument("--large-output", type=Path, default=Path(tempfile.gettempdir()) / "vibe-large-qualification")
+    args = parser.parse_args()
     q = Qualification()
     commit = q.command("source identity", ["git", "rev-parse", "HEAD"])
     runtime_version = q.command(
@@ -99,6 +107,20 @@ def main() -> int:
     q.command("pytest", [sys.executable, "-m", "pytest", "-q"])
     q.command("branch coverage run", [sys.executable, "-m", "coverage", "run", "-m", "pytest", "-q"])
     q.command("branch coverage >= 90%", [sys.executable, "-m", "coverage", "report", "--fail-under=90"])
+    q.command("frozen detection review", [sys.executable, "scripts/review_detection.py"])
+    q.command("golden report regression", [sys.executable, "scripts/golden_report.py"])
+    signoff = (ROOT / "docs" / "GOLDEN-REPORT-SIGNOFF.md").read_text(encoding="utf-8")
+    fields = dict(line.split(": ", 1) for line in signoff.splitlines() if ": " in line and not line.startswith("-"))
+    golden_hash = hashlib.sha256((ROOT / "examples/sample-assessment/beta-golden.md").read_text(encoding="utf-8").replace("\r\n", "\n").encode()).hexdigest()
+    q.record("golden analyst signoff", fields.get("Status") == "APPROVED"
+             and fields.get("Reviewer", "pending") != "pending"
+             and fields.get("Approved output SHA-256") == golden_hash
+             and fields.get("Review date", "pending") != "pending"
+             and "- [ ]" not in signoff, "requires named analyst review of pinned artifact")
+    if args.large_targets:
+        q.command("large repository qualification", [sys.executable, "scripts/qualify_large_repos.py", "--targets", str(args.large_targets.resolve()), "--output", str(args.large_output.resolve())])
+    else:
+        q.record("large repository qualification", False, "external inputs missing: pass --large-targets; no network fetch is performed")
 
     with tempfile.TemporaryDirectory(prefix="vibe-explainer-qualification-") as temp:
         temp_root = Path(temp)
@@ -150,15 +172,17 @@ def main() -> int:
         cli = _cli_in(environment)
         if wheels and vpython.exists():
             q.command("clean wheel install", [str(vpython), "-m", "pip", "install", "--no-deps", "--no-index", str(wheels[0])])
-            version_result = q.command("installed CLI version", [str(cli), "--version"])
+            version_result = q.command("installed CLI version", [str(cli), "--version"], cwd=temp_root)
+            q.command("installed CLI help", [str(cli), "--help"], cwd=temp_root)
+            q.command("installed import isolated from source", [str(vpython), "-I", "-c", "import pathlib,sys,vibe_explainer; assert pathlib.Path(vibe_explainer.__file__).is_relative_to(sys.prefix)"], cwd=temp_root)
             q.record("installed version identity", version_result.stdout.strip() == f"vibe-explainer {VERSION}", version_result.stdout.strip())
 
             fixture = ROOT / "examples" / "analyst-review-fixture"
-            terminal = q.command("terminal assessment smoke", [str(cli), str(fixture)])
+            terminal = q.command("terminal assessment smoke", [str(cli), str(fixture)], cwd=temp_root)
             json_path = temp_root / "review.json"
             markdown_path = temp_root / "review.md"
-            q.command("JSON assessment smoke", [str(cli), str(fixture), "--json", "--out", str(json_path)])
-            q.command("Markdown assessment smoke", [str(cli), str(fixture), "--report", "--out", str(markdown_path)])
+            q.command("JSON assessment smoke", [str(cli), str(fixture), "--json", "--out", str(json_path)], cwd=temp_root)
+            q.command("Markdown assessment smoke", [str(cli), str(fixture), "--report", "--out", str(markdown_path)], cwd=temp_root)
             q.command("output non-overwrite", [str(cli), str(fixture), "--json", "--out", str(json_path)], expect=2)
             payload = json.loads(json_path.read_text(encoding="utf-8")) if json_path.exists() else {}
             executive = payload.get("executive_summary", {})

@@ -1,0 +1,38 @@
+{
+  "id": "multi_file_import",
+  "language": "python",
+  "construct": "multi_file",
+  "path": "unused.py",
+  "source": "",
+  "files": [
+    {
+      "path": "provider.py",
+      "source": "SYSTEM_PROMPT = 'Be concise'\n"
+    },
+    {
+      "path": "app.py",
+      "source": "from provider import SYSTEM_PROMPT\nresult = client.chat.completions.create(model='gpt-4o', messages=[{'role': 'system', 'content': SYSTEM_PROMPT}])\n"
+    }
+  ],
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "prompt_surface",
+      "name": "System prompt variable",
+      "evidence_basis": "PYTHON_AST"
+    },
+    {
+      "category": "ai_usage",
+      "name": "Chat/completions call",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ],
+  "expected_relationships": [
+    {
+      "source_file": "provider.py",
+      "destination_file": "app.py",
+      "relationship": "feeds_prompt",
+      "resolution_method": "PYTHON_IMPORT_SYMBOL"
+    }
+  ]
+}

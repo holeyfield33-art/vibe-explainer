@@ -1,0 +1,1559 @@
+{
+  "error_analysis": [
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "providers_retrieval",
+      "mismatch": false,
+      "observed": true,
+      "signal": "model_provider"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "providers_retrieval",
+      "mismatch": false,
+      "observed": true,
+      "signal": "ai_usage"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "providers_retrieval",
+      "mismatch": false,
+      "observed": true,
+      "signal": "rag_retrieval"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "providers_retrieval",
+      "mismatch": false,
+      "observed": true,
+      "signal": "prompt_surface"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "providers_retrieval",
+      "mismatch": false,
+      "observed": true,
+      "signal": "secret_config"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "model_provider"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "ai_usage"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "tool_agent"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "mcp"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "C05"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "C06"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "C07"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "guarded_tools",
+      "mismatch": false,
+      "observed": true,
+      "signal": "C12"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "database",
+      "mismatch": false,
+      "observed": true,
+      "signal": "external_integration"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "model_provider"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "ai_usage"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "rag_retrieval"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "prompt_surface"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "secret_config"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "tool_agent"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "mcp"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "external_integration"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "C05"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "C06"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "C07"
+    },
+    {
+      "expected": false,
+      "fixed": false,
+      "fixture": "misleading_name",
+      "mismatch": false,
+      "observed": false,
+      "signal": "C12"
+    },
+    {
+      "expected": true,
+      "fixed": false,
+      "fixture": "prompt_file_and_developer_role",
+      "mismatch": true,
+      "observed": false,
+      "signal": "prompt_surface"
+    }
+  ],
+  "frozen_corpus": {
+    "by_construct": {
+      "alias": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "assignment": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "call": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "comment": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 1.0
+      },
+      "configuration": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "dead_code": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 1.0,
+        "unsupported_rate": 0.0
+      },
+      "decorator": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 1.0,
+        "unsupported_rate": 0.0
+      },
+      "decorator_provenance": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "example_context": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "framework": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 2,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 2,
+          "correct": 2
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 2,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "generated_context": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "import": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "multi_file": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "negative_control": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "obfuscation": {
+        "authoritative_precision": null,
+        "authoritative_recall": 0.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 0.0,
+        "false_negative": 1,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 0.0,
+          "cases": 1,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "parse_failure": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 1.0,
+        "unsupported_rate": 0.0
+      },
+      "real_world": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 2,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 2,
+          "correct": 2
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 2,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "retrieval": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 1.0,
+        "unsupported_rate": 0.0
+      },
+      "retrieval_provenance": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "string": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 2,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 2,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "test_context": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "unsupported_language": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 2,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 2,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 1.0
+      },
+      "wrapper": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      }
+    },
+    "by_language": {
+      "javascript": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 1.0
+      },
+      "python": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 0.9375,
+        "cases": 24,
+        "context": {
+          "accuracy": 1.0,
+          "cases": 3,
+          "correct": 3
+        },
+        "disposition_accuracy": 0.9583,
+        "false_negative": 1,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 0.9375,
+          "cases": 16,
+          "correct": 15
+        },
+        "relationship": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "true_negative": 8,
+        "true_positive": 15,
+        "unresolved_rate": 0.1667,
+        "unsupported_rate": 0.0417
+      },
+      "structured_config": {
+        "authoritative_precision": 1.0,
+        "authoritative_recall": 1.0,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": 1.0,
+          "cases": 1,
+          "correct": 1
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 0,
+        "true_positive": 1,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 0.0
+      },
+      "typescript": {
+        "authoritative_precision": null,
+        "authoritative_recall": null,
+        "cases": 1,
+        "context": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "disposition_accuracy": 1.0,
+        "false_negative": 0,
+        "false_positive": 0,
+        "finding_identity": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "relationship": {
+          "accuracy": null,
+          "cases": 0,
+          "correct": 0
+        },
+        "true_negative": 1,
+        "true_positive": 0,
+        "unresolved_rate": 0.0,
+        "unsupported_rate": 1.0
+      }
+    },
+    "cases": [
+      {
+        "actual": "authoritative",
+        "construct": "import",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_openai_import",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "alias",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_aliased_import",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "wrapper",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_wrapper",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "call",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_chat_call",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "assignment",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_prompt_assignment",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unresolved",
+        "construct": "decorator",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unresolved",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_tool_decorator",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "decorator_provenance",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_tool_decorator_provenance",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unresolved",
+        "construct": "retrieval",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unresolved",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_rag_call",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "retrieval_provenance",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_rag_call_provenance",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "framework",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_mcp_server",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "framework",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "py_langchain_variant",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unsupported",
+        "construct": "comment",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unsupported",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_comment_signature",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "none",
+        "construct": "string",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "none",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_string_embedded_call",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "none",
+        "construct": "string",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "none",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_bare_provider_string",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unresolved",
+        "construct": "dead_code",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unresolved",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_dead_branch",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unresolved",
+        "construct": "parse_failure",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unresolved",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "py_parse_failure",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "none",
+        "construct": "obfuscation",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": false,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": false,
+        "id": "py_obfuscated_import",
+        "known_limitation": true,
+        "language": "python",
+        "mandatory": false,
+        "passed": false,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unsupported",
+        "construct": "unsupported_language",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unsupported",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "ts_vercel_sdk",
+        "known_limitation": false,
+        "language": "typescript",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "unsupported",
+        "construct": "unsupported_language",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "unsupported",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "js_openai_endpoint",
+        "known_limitation": false,
+        "language": "javascript",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "configuration",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "config_model_key",
+        "known_limitation": false,
+        "language": "structured_config",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "generated_context",
+        "context_applicable": true,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "generated_context",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "test_context",
+        "context_applicable": true,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "test_context",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "example_context",
+        "context_applicable": true,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "example_context",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "multi_file",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "multi_file_import",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": true,
+        "relationship_pass": true
+      },
+      {
+        "actual": "none",
+        "construct": "negative_control",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "none",
+        "finding_identity_applicable": false,
+        "finding_identity_pass": true,
+        "id": "plain_python",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "real_world",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "real_openai_sdk_readme",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      },
+      {
+        "actual": "authoritative",
+        "construct": "real_world",
+        "context_applicable": false,
+        "context_pass": true,
+        "disposition_pass": true,
+        "expected": "authoritative",
+        "finding_identity_applicable": true,
+        "finding_identity_pass": true,
+        "id": "real_anthropic_sdk_readme",
+        "known_limitation": false,
+        "language": "python",
+        "mandatory": true,
+        "passed": true,
+        "relationship_applicable": false,
+        "relationship_pass": true
+      }
+    ],
+    "corpus_version": "2026.09.16-3",
+    "known_mismatches": [
+      "py_obfuscated_import"
+    ],
+    "label_review": {
+      "labeler": "implementation team",
+      "required_reviewer": "independent reviewer who did not implement the detector",
+      "review_notes": null,
+      "reviewed_version": null,
+      "status": "PENDING_INDEPENDENT_REVIEW"
+    },
+    "mandatory_mismatches": [],
+    "metric_gate": {
+      "python_authoritative_precision_minimum": 0.9
+    },
+    "overall": {
+      "authoritative_precision": 1.0,
+      "authoritative_recall": 0.9412,
+      "cases": 27,
+      "context": {
+        "accuracy": 1.0,
+        "cases": 3,
+        "correct": 3
+      },
+      "disposition_accuracy": 0.963,
+      "false_negative": 1,
+      "false_positive": 0,
+      "finding_identity": {
+        "accuracy": 0.9412,
+        "cases": 17,
+        "correct": 16
+      },
+      "relationship": {
+        "accuracy": 1.0,
+        "cases": 1,
+        "correct": 1
+      },
+      "true_negative": 10,
+      "true_positive": 16,
+      "unresolved_rate": 0.1481,
+      "unsupported_rate": 0.1111
+    },
+    "schema_version": "2.0"
+  },
+  "note": "Small implementation-authored corpus; descriptive detector metrics only. No statistical or control-effectiveness claims.",
+  "review_status": "PENDING_INDEPENDENT_REVIEW",
+  "supplemental_by_signal": {
+    "C05": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "C06": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "C07": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "C12": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "ai_usage": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 2
+    },
+    "external_integration": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "mcp": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "model_provider": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 2
+    },
+    "prompt_surface": {
+      "fn": 1,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "tn": 1,
+      "tp": 1
+    },
+    "rag_retrieval": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "secret_config": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    },
+    "tool_agent": {
+      "fn": 0,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "tn": 1,
+      "tp": 1
+    }
+  }
+}

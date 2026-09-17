@@ -1,0 +1,15 @@
+{
+  "id": "py_langchain_variant",
+  "language": "python",
+  "construct": "framework",
+  "path": "chain.py",
+  "source": "from langchain.agents import create_agent\nagent = create_agent(model, tools=[])\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "ai_usage",
+      "name": "LangChain",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import subprocess
 import sys
 from pathlib import Path
@@ -13,6 +14,7 @@ from .integrate_vibe_check import load_vibe_check_report, summarize_vibe_finding
 from .output import OutputExistsError, atomic_write_text
 from .report import render_markdown
 from .scanner import scan_repo
+from .scan_budget import ACTIVE, ScanBudget
 from .security_utils import redact_secrets, redact_structure
 
 
@@ -27,7 +29,7 @@ def _git_provenance(repo: Path) -> dict[str, object]:
     def git(*args: str) -> str | None:
         try:
             result = subprocess.run(
-                ["git", "-C", str(repo), *args], capture_output=True, text=True,
+                ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", str(repo), *args], capture_output=True, text=True,
                 timeout=5, check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
@@ -43,6 +45,20 @@ def _git_provenance(repo: Path) -> dict[str, object]:
         "dirty": bool(status) if status is not None else None,
         "available": commit is not None,
     }
+
+
+def _positive_seconds(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number) or number <= 0:
+        raise argparse.ArgumentTypeError("budget must be finite and positive")
+    return number
+
+
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number <= 0:
+        raise argparse.ArgumentTypeError("budget must be positive")
+    return number
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -125,6 +141,9 @@ def build_parser() -> argparse.ArgumentParser:
         action="version",
         version=f"vibe-explainer {__version__}",
     )
+    p.add_argument("--max-files", type=_positive_int, default=20_000, help="Maximum unique content files inspected across analysis stages.")
+    p.add_argument("--max-bytes", type=_positive_int, default=200_000_000, help="Maximum unique content bytes inspected.")
+    p.add_argument("--max-seconds", type=_positive_seconds, default=120.0, help="Cooperative elapsed analysis budget; a PARTIAL report exits 0.")
     return p
 
 
@@ -210,6 +229,9 @@ def _run_security_mode(
     asi_catalog: str | None = None,
     experimental_scoring: bool = False,
     force: bool = False,
+    max_files: int = 20_000,
+    max_bytes: int = 200_000_000,
+    max_seconds: float = 120.0,
 ) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
@@ -220,6 +242,8 @@ def _run_security_mode(
     from .risk import assess_risks
     from .security_report import build_report, render_text
 
+    budget = ScanBudget(repo.resolve(), max_files, max_bytes, max_seconds)
+    token = ACTIVE.set(budget)
     try:
         excluded_paths: set[str] = set()
         if out:
@@ -229,14 +253,26 @@ def _run_security_mode(
             except ValueError:
                 pass
 
+        budget.excluded_paths = excluded_paths
         discovery = discover_ai(repo, excluded_paths=excluded_paths)
         surface = build_attack_surface(discovery)
         dataflow = build_dataflow(discovery)
         controls = assess_controls(discovery, surface, dataflow)
+        if budget.reason:
+            for control in controls.controls:
+                if control.status in {"NOT_FOUND", "NOT_APPLICABLE"}:
+                    control.status = "UNKNOWN"
+                    control.rationale = "Scan budget reached; this control was not fully assessed."
         risks = assess_risks(discovery, surface, dataflow, controls)
         readiness = assess_readiness(
             discovery, surface, dataflow, controls, risks, excluded_paths=excluded_paths
         )
+        budget.check()
+        if budget.reason or budget.parse_failures:
+            discovery.budget_exhausted = bool(budget.reason)
+            discovery.budget_exhausted_reason = budget.reason
+            risks.assessment_completeness = "PARTIAL"
+            readiness.assessment_completeness = "PARTIAL"
         report = build_report(
             discovery,
             surface,
@@ -246,8 +282,17 @@ def _run_security_mode(
             readiness,
             include_experimental_scoring=experimental_scoring,
         )
+        report.metadata["scan_scope"] = budget.snapshot()
         report.metadata["repository_revision"] = _git_provenance(repo)
+        report.metadata["evidence_counts"] = {
+            "ai_evidence_items": len(discovery.findings),
+            "attack_surface_leads": sum(len(items) for items in report.attack_surface.values()),
+            "control_observations": sum(len(control.evidence) for control in controls.controls),
+        }
+        if budget.reason or budget.parse_failures:
+            report.limitations.append("Partial analysis: " + (budget.reason or "Python parse failures") + ". Absence of evidence outside inspected scope is not evidence of absence.")
         report.metadata["scan_configuration"] = {
+            "max_files": max_files, "max_bytes": max_bytes, "max_seconds": max_seconds,
             "excluded_paths": sorted(excluded_paths),
             "experimental_scoring": experimental_scoring,
             "asi_catalog_supplied": bool(asi_catalog),
@@ -270,6 +315,8 @@ def _run_security_mode(
     except Exception as exc:  # noqa: BLE001 — surface cleanly, never a raw traceback
         print(redact_secrets(f"Unable to analyze repository:\n{exc}"), file=sys.stderr)
         return 1
+    finally:
+        ACTIVE.reset(token)
 
     if as_json:
         payload = report.to_dict()
@@ -294,6 +341,9 @@ def _run_security_mode(
         except OutputExistsError as exc:
             print(redact_secrets(f"Unable to write report: {exc}"), file=sys.stderr)
             return 2
+        except OSError as exc:
+            print(redact_secrets(f"Unable to write report: {exc}"), file=sys.stderr)
+            return 1
         print(redact_secrets(f"Wrote {out_path}"), file=sys.stderr)
     else:
         _print_portable(output)
@@ -323,6 +373,9 @@ def main(argv: list[str] | None = None) -> int:
             args.asi_catalog,
             args.experimental_scoring,
             args.force,
+            args.max_files,
+            args.max_bytes,
+            args.max_seconds,
         )
 
     if args.json or args.detailed_report or args.asi_catalog or args.experimental_scoring:

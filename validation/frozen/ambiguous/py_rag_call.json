@@ -1,0 +1,8 @@
+{
+  "id": "py_rag_call",
+  "language": "python",
+  "construct": "retrieval",
+  "path": "rag.py",
+  "source": "docs = store.similarity_search(query)\n",
+  "expected": "unresolved"
+}

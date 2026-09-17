@@ -121,6 +121,9 @@ def assessment_manifest(metadata: dict[str, Any]) -> dict[str, Any]:
         },
         "assessment_completeness": metadata.get("assessment_completeness"),
         "scan_configuration": scan_configuration,
+        "repository": metadata.get("repository"),
+        "scan_scope": metadata.get("scan_scope", {}),
+        "evidence_counts": metadata.get("evidence_counts", {}),
         "asi_catalog": {
             "supplied": bool(asi_catalog.get("supplied", False)),
             "source_hash": asi_catalog.get("source_hash"),

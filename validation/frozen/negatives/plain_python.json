@@ -1,0 +1,8 @@
+{
+  "id": "plain_python",
+  "language": "python",
+  "construct": "negative_control",
+  "path": "maths.py",
+  "source": "def add(a, b):\n    return a + b\n",
+  "expected": "none"
+}

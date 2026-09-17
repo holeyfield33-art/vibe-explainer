@@ -17,4 +17,8 @@ EXPLAIN.md
 !validation/
 !validation/corpus.json
 !validation/metrics.json
+!validation/beta-freeze.json
+!validation/beta-review-metrics.json
+!validation/frozen/
+!validation/frozen/**/*.json
 .DS_Store

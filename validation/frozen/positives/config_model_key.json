@@ -1,0 +1,15 @@
+{
+  "id": "config_model_key",
+  "language": "structured_config",
+  "construct": "configuration",
+  "path": ".env",
+  "source": "OPENAI_API_KEY=replace-me\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "secret_config",
+      "name": "Model API key env var",
+      "evidence_basis": "CONFIG_ARTIFACT"
+    }
+  ]
+}

@@ -1,5 +1,24 @@
 # Agent Security Index Mapping
 
+## Stable offline compatibility seam
+
+Report schema `2.0` and ASI schema `2.0` remain separate. Consumers use the
+assessment manifest (engine version, repository revision, scan configuration,
+completeness), occurrence-based finding IDs, relative paths/lines, evidence basis,
+context and `supports_conclusions`. Control artifact/enforcement/effectiveness
+axes must remain independent. Partial reports retain IDs but carry reduced scope.
+
+Future adapters may attach optional local taxonomy references keyed by evidence ID:
+taxonomy name/version, identifier (ASI class, CWE, CAPEC, OWASP, CVE/incident or
+mitigation), mapping rationale, evidence references and analyst-review state.
+This is an adapter contract, not a second emitted mapping schema in this release.
+Reuse the existing local ASI mapper for ASI classes. A CVE/incident reference means
+context for analyst review, never a claim that the target is affected.
+Absent mappings are valid; unavailable catalogs must not block ordinary reports.
+No network, remote taxonomy, automatic ASI call or dependency on another Aletheia
+repository is introduced. Existing pinned-catalog and independent-axis tests remain
+the compatibility validation; consumers must reject unknown schema majors.
+
 Vibe Explainer can map an evidence review to a local Agent Security Index catalog with
 `--asi-catalog`. The bridge is offline and deterministic. It does not detect attacks,
 validate mitigations, or establish conformance with ASI.

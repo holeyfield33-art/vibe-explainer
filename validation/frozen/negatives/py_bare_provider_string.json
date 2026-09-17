@@ -1,0 +1,8 @@
+{
+  "id": "py_bare_provider_string",
+  "language": "python",
+  "construct": "string",
+  "path": "labels.py",
+  "source": "label = \"openai\"\n",
+  "expected": "none"
+}

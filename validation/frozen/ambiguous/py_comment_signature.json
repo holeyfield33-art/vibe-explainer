@@ -1,0 +1,8 @@
+{
+  "id": "py_comment_signature",
+  "language": "python",
+  "construct": "comment",
+  "path": "app.py",
+  "source": "# from openai import OpenAI\nvalue = 1\n",
+  "expected": "unsupported"
+}

@@ -80,7 +80,10 @@ def build_symbol_index(analyzed_files: list[tuple[str, str]]) -> SymbolIndex:
     crawl.
     """
     index = SymbolIndex()
+    from .scan_budget import within_budget
     for rel_path, content in analyzed_files:
+        if not within_budget():
+            break
         if rel_path.endswith(".py"):
             info = _index_python(rel_path, content)
             index.module_paths[_module_key_for_python(rel_path)] = rel_path

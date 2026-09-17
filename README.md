@@ -129,3 +129,9 @@ defines the current scanner boundary and sensitive-report handling expectations.
 ## License
 
 Apache License 2.0; see [LICENSE](LICENSE).
+# Beta qualification
+
+Budgeted client-review preparation and reproducible qualification are documented in
+[the release guide](docs/RELEASING.md). The current candidate is **not approved for
+Analyst-Assisted Beta** until independent detection-label review and golden analyst
+signoff pass. See [the beta report](docs/BETA-RELEASE-REPORT.md).

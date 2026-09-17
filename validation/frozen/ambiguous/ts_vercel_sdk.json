@@ -1,0 +1,8 @@
+{
+  "id": "ts_vercel_sdk",
+  "language": "typescript",
+  "construct": "unsupported_language",
+  "path": "app.ts",
+  "source": "import { streamText } from 'ai';\nstreamText({ model });\n",
+  "expected": "unsupported"
+}

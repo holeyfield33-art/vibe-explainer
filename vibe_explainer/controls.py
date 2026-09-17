@@ -41,6 +41,7 @@ from .attack_surface import AttackSurfaceResult
 from .dataflow import DataFlowGraph, DataFlowObservation
 from .exclusion_policy import safe_regular_file_size, walk_pruned
 from .security_utils import minimal_match_excerpt
+from .scan_budget import within_budget
 
 STATUS_EVIDENCE_FOUND = "EVIDENCE_FOUND"
 STATUS_PARTIAL = "PARTIAL"
@@ -201,6 +202,8 @@ def _evidence_id(file: str, occurrence: int, tag: str) -> str:
 def _iter_doc_files(root_path: Path):
     for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
+            if not within_budget():
+                return
             full = Path(dirpath) / name
             if full.suffix.lower() in DOC_EXTS:
                 yield full
@@ -218,7 +221,11 @@ def _scan_code_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
             continue
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
         for control_id, tag, pattern, confidence in _CODE_EVIDENCE_PATTERNS:
+            if not within_budget():
+                break
             for match in pattern.finditer(text):
+                if not within_budget():
+                    break
                 line_no = text.count("\n", 0, match.start()) + 1
                 evidence_text = _line_evidence_text(text, match.start(), match.end())
                 by_control.setdefault(control_id, []).append(
@@ -239,7 +246,11 @@ def _scan_doc_evidence(root_path: Path) -> dict[str, list[_EvidenceMatch]]:
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
 
         for control_id, tag, pattern, confidence in _DOC_EVIDENCE_PATTERNS:
+            if not within_budget():
+                break
             for match in pattern.finditer(text):
+                if not within_budget():
+                    break
                 line_no = text.count("\n", 0, match.start()) + 1
                 evidence_text = _line_evidence_text(text, match.start(), match.end())
                 by_control.setdefault(control_id, []).append(
@@ -354,6 +365,8 @@ def _structural_coverage(
         structure = structures.get(finding.file)
         finding_scope = _scope_at(structure, finding.line) if structure else None
         for match in matches:
+            if not within_budget():
+                break
             if not structure or match.file != finding.file:
                 continue
             if _scope_at(structure, match.line) is not finding_scope:

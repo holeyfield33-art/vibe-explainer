@@ -57,6 +57,7 @@ from pathlib import Path
 from typing import Any
 
 from .ai_discovery import AIFinding, DiscoveryResult, _read_text
+from .scan_budget import within_budget
 from .security_utils import redact_secrets
 
 # Proximity threshold: two findings farther apart than this (same file) are not
@@ -370,8 +371,12 @@ def _parse_python_facts(root: Path, files: set[str]) -> dict[str, _PythonFacts]:
         functions = [n for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda))]
         facts = _PythonFacts(tree, statements, functions, {})
         for scope in [tree, *functions]:
+            if not within_budget():
+                break
             rows: list[tuple[int, set[str], set[str]]] = []
             for statement in statements:
+                if not within_budget():
+                    break
                 if _scope_for(facts, _node_span(statement)[0]) is not scope:
                     continue
                 targets = _stored_names(statement)
@@ -506,7 +511,11 @@ def build_dataflow(discovery: DiscoveryResult) -> DataFlowGraph:
         sources = [f for f in eligible if f.category == source_cat]
         destinations = [f for f in eligible if f.category == dest_cat]
         for source in sources:
+            if not within_budget():
+                break
             for dest in destinations:
+                if not within_budget():
+                    break
                 basis: set[str] = set()
                 reason = "UNSUPPORTED_LANGUAGE_OR_PARSE"
                 method = "PYTHON_DEF_USE"

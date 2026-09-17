@@ -1,0 +1,16 @@
+{
+  "id": "generated_context",
+  "language": "python",
+  "construct": "generated_context",
+  "path": "generated/client.py",
+  "source": "from openai import OpenAI\n",
+  "expected": "authoritative",
+  "expected_context": "GENERATED",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "OpenAI",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

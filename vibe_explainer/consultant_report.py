@@ -51,6 +51,16 @@ def render_consultant_markdown(report: VibeExplainerReport, *, assessment_date: 
         "leads, inferred relationships, control artifacts, concern scenarios, and process "
         "signals. Does not include runtime testing or adversarial validation.")
     add(f"- **Assessment completeness:** {m['assessment_completeness']}")
+    scope = m.get("scan_scope")
+    if scope:
+        add(f"- **Elapsed analysis seconds:** {scope['elapsed_seconds']}")
+        add(f"- **Files discovered / inspected / skipped:** {scope['files_discovered']} / {scope['files_inspected']} / {scope['files_skipped']}")
+        add(f"- **Bytes inspected:** {scope['bytes_inspected']}")
+        add(f"- **Budget termination:** {scope['budget_exhausted_reason'] or 'none'}")
+        add(f"- **Applied exclusions:** {_cell(', '.join(scope['exclusions_applied'])) or 'none'}")
+        add(f"- **Parse failures:** {_cell(', '.join(scope['parse_failures'])) or 'none'}")
+        add(f"- **Extensions outside AI discovery (documents may be read for controls):** {_cell(', '.join(scope['unsupported_extensions'])) or 'none'}")
+        add(f"> {scope['scope_note']}")
     revision = m.get("repository_revision") or {}
     add(f"- **Repository revision available:** {str(bool(revision.get('available'))).lower()}")
     add(f"- **Repository commit:** `{revision.get('commit') or 'not available'}`")

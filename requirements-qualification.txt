@@ -1,0 +1,5 @@
+# Developer tooling only; no runtime dependencies. Validated on Python 3.14.
+build==1.6.1
+coverage==7.16.1
+pytest==9.1.1
+setuptools==84.0.0

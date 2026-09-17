@@ -1,0 +1,15 @@
+{
+  "id": "py_tool_decorator_provenance",
+  "language": "python",
+  "construct": "decorator_provenance",
+  "path": "tools.py",
+  "source": "from langchain_core.tools import tool\n\n@tool\ndef lookup(query: str):\n    return query\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "tool_agent",
+      "name": "Tool/function decorator",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

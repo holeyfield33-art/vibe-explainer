@@ -1,0 +1,15 @@
+{
+  "id": "py_rag_call_provenance",
+  "language": "python",
+  "construct": "retrieval_provenance",
+  "path": "rag.py",
+  "source": "from langchain_chroma import Chroma\n\nstore = Chroma(collection_name=\"docs\")\ndocs = store.similarity_search(query)\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "rag_retrieval",
+      "name": "Vector store / retriever",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

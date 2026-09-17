@@ -1,0 +1,15 @@
+{
+  "id": "py_prompt_assignment",
+  "language": "python",
+  "construct": "assignment",
+  "path": "prompt.py",
+  "source": "SYSTEM_PROMPT = \"Be concise\"\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "prompt_surface",
+      "name": "System prompt variable",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

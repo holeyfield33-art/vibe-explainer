@@ -1,0 +1,8 @@
+{
+  "id": "py_dead_branch",
+  "language": "python",
+  "construct": "dead_code",
+  "path": "dead.py",
+  "source": "if False:\n    from openai import OpenAI\n",
+  "expected": "unresolved"
+}

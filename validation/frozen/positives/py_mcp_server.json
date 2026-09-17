@@ -1,0 +1,15 @@
+{
+  "id": "py_mcp_server",
+  "language": "python",
+  "construct": "framework",
+  "path": "server.py",
+  "source": "from mcp.server.fastmcp import FastMCP\nserver = FastMCP(\"demo\")\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "mcp",
+      "name": "FastMCP server",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

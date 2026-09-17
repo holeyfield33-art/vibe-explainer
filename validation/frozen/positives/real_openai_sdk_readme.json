@@ -1,0 +1,22 @@
+{
+  "id": "real_openai_sdk_readme",
+  "language": "python",
+  "construct": "real_world",
+  "path": "example.py",
+  "source": "from openai import OpenAI\nclient = OpenAI()\nresponse = client.responses.create(model=\"gpt-5.2\", input=\"Hello\")\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "OpenAI",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ],
+  "provenance": {
+    "repository": "https://github.com/openai/openai-python",
+    "commit": "98e1d24f4902ab58830adf0e2b6a729a5d5429b1",
+    "source_path": "README.md",
+    "license": "Apache-2.0",
+    "adaptation": "API-shape-preserving minimal adaptation from the pinned upstream README example. Credentials, model identifier, token count, message payload, and unrelated lines may be simplified for deterministic static-analysis testing."
+  }
+}

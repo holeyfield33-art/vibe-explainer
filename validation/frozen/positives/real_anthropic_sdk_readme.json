@@ -1,0 +1,22 @@
+{
+  "id": "real_anthropic_sdk_readme",
+  "language": "python",
+  "construct": "real_world",
+  "path": "example.py",
+  "source": "import os\nfrom anthropic import Anthropic\nclient = Anthropic(api_key=os.environ.get(\"ANTHROPIC_API_KEY\"))\nmessage = client.messages.create(model=\"claude-opus-4-6\", max_tokens=32, messages=[])\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "Anthropic",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ],
+  "provenance": {
+    "repository": "https://github.com/anthropics/anthropic-sdk-python",
+    "commit": "7e5ca5c94126a6d7de159a169ff43eb9b1cac57f",
+    "source_path": "README.md",
+    "license": "MIT",
+    "adaptation": "API-shape-preserving minimal adaptation from the pinned upstream README example. Credentials, model identifier, token count, message payload, and unrelated lines may be simplified for deterministic static-analysis testing."
+  }
+}

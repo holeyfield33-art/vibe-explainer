@@ -145,17 +145,27 @@ def walk_pruned(root_path: str | Path) -> Iterator[tuple[str, list[str], list[st
     Callers still filter ``filenames`` for their own purposes (extension,
     doc-vs-code, etc.); this only owns the traversal and pruning.
     """
+    from .scan_budget import ACTIVE
+    budget = ACTIVE.get()
     root_path = Path(root_path)
     for dirpath, dirnames, filenames in os.walk(root_path):
+        if budget and not budget.check():
+            return
         dirpath_obj = Path(dirpath)
         pruned = []
         for d in dirnames:
             if classify_dir_exclusion(d).excluded:
+                if budget:
+                    budget.exclusions.add((dirpath_obj / d).relative_to(root_path).as_posix() + "/")
                 continue
             if (dirpath_obj / d).is_symlink():
+                if budget:
+                    budget.exclusions.add((dirpath_obj / d).relative_to(root_path).as_posix() + "/ (symlink)")
                 continue
             pruned.append(d)
         dirnames[:] = sorted(pruned)
+        if budget:
+            budget.discovered.update((dirpath_obj / name).relative_to(root_path).as_posix() for name in filenames)
         yield dirpath, dirnames, sorted(filenames)
 
 

@@ -1,0 +1,111 @@
+{
+  "version": "2026.09.17-beta-1",
+  "status": "FROZEN_PENDING_INDEPENDENT_REVIEW",
+  "corpus_sha256": "b858b30cf2c9c4cf1c99c0ecd4043c2955bc886bea4c5f541085f9f3992f4420",
+  "partitions": {
+    "positives": [
+      "py_openai_import",
+      "py_aliased_import",
+      "py_wrapper",
+      "py_chat_call",
+      "py_prompt_assignment",
+      "py_tool_decorator_provenance",
+      "py_rag_call_provenance",
+      "py_mcp_server",
+      "py_langchain_variant",
+      "py_obfuscated_import",
+      "config_model_key",
+      "generated_context",
+      "test_context",
+      "example_context",
+      "multi_file_import",
+      "real_openai_sdk_readme",
+      "real_anthropic_sdk_readme"
+    ],
+    "negatives": [
+      "py_string_embedded_call",
+      "py_bare_provider_string",
+      "plain_python"
+    ],
+    "ambiguous": [
+      "py_tool_decorator",
+      "py_rag_call",
+      "py_comment_signature",
+      "py_dead_branch",
+      "py_parse_failure",
+      "ts_vercel_sdk",
+      "js_openai_endpoint"
+    ]
+  },
+  "supplemental_cases": [
+    {
+      "id": "providers_retrieval",
+      "files": {
+        "app.py": "\"\"\"Synthetic review input; never execute or install this example.\"\"\"\nimport os\nfrom anthropic import Anthropic\nfrom langchain_chroma import Chroma\n\nclient = Anthropic(api_key=os.getenv(\"ANTHROPIC_API_KEY\"))\nstore = Chroma(collection_name=\"approved_documents\")\n\n\ndef answer(question):\n    documents = store.similarity_search(question)\n    prompt_template = f\"Use the retrieved context: {documents}. Question: {question}\"\n    response = client.messages.create(\n        model=\"example-model\", max_tokens=100,\n        messages=[{\"role\": \"user\", \"content\": prompt_template}],\n    )\n    return response.content\n"
+      },
+      "labels": {
+        "model_provider": true,
+        "ai_usage": true,
+        "rag_retrieval": true,
+        "prompt_surface": true,
+        "secret_config": true
+      }
+    },
+    {
+      "id": "guarded_tools",
+      "files": {
+        "app.py": "\"\"\"Synthetic example of boundaries an analyst must validate; never execute.\"\"\"\nimport subprocess\nfrom langchain_core.tools import tool\nfrom mcp.server.fastmcp import FastMCP\nfrom openai import OpenAI\n\nmcp = FastMCP(\"synthetic-review\")\nclient = OpenAI()\n\n\n@tool\n@mcp.tool()\ndef propose_action(question, user):\n    response = client.chat.completions.create(\n        model=\"example-model\", messages=[{\"role\": \"user\", \"content\": question}],\n    )\n    if not check_permission(user, \"run\"):\n        raise PermissionError(\"denied\")\n    if not human_approval(response):\n        raise PermissionError(\"approval required\")\n    audit_log(\"approved model action\")\n    # The bodies of these external controls are deliberately unavailable.\n    with sandbox():\n        return subprocess.run(response.choices[0].message.content, shell=True)\n"
+      },
+      "labels": {
+        "model_provider": true,
+        "ai_usage": true,
+        "tool_agent": true,
+        "mcp": true,
+        "C05": true,
+        "C06": true,
+        "C07": true,
+        "C12": true
+      }
+    },
+    {
+      "id": "database",
+      "files": {
+        "app.py": "import sqlalchemy\nengine = sqlalchemy.create_engine('sqlite://')\n"
+      },
+      "labels": {
+        "external_integration": true
+      }
+    },
+    {
+      "id": "misleading_name",
+      "files": {
+        "openai_agent_mcp.py": "# Agent architecture discussion only\nvalue = 42\n"
+      },
+      "labels": {
+        "model_provider": false,
+        "ai_usage": false,
+        "rag_retrieval": false,
+        "prompt_surface": false,
+        "secret_config": false,
+        "tool_agent": false,
+        "mcp": false,
+        "external_integration": false,
+        "C05": false,
+        "C06": false,
+        "C07": false,
+        "C12": false
+      }
+    },
+    {
+      "id": "prompt_file_and_developer_role",
+      "files": {
+        "instructions.txt": "You are a helpful assistant.\n",
+        "app.py": "messages = [{'role': 'developer', 'content': 'Follow policy'}]\n"
+      },
+      "labels": {
+        "prompt_surface": true
+      }
+    }
+  ],
+  "policy": "No detector tuning against this evaluation version. Amend disputed labels only in a new independently reviewed version."
+}

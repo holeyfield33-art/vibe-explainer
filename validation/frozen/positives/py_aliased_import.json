@@ -1,0 +1,15 @@
+{
+  "id": "py_aliased_import",
+  "language": "python",
+  "construct": "alias",
+  "path": "app.py",
+  "source": "from openai import OpenAI as Client\nclient = Client()\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "OpenAI",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

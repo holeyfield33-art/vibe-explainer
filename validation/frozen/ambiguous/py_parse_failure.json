@@ -1,0 +1,8 @@
+{
+  "id": "py_parse_failure",
+  "language": "python",
+  "construct": "parse_failure",
+  "path": "broken.py",
+  "source": "from openai import\n",
+  "expected": "unresolved"
+}

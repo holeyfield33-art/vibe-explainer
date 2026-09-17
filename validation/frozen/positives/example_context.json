@@ -1,0 +1,16 @@
+{
+  "id": "example_context",
+  "language": "python",
+  "construct": "example_context",
+  "path": "examples/demo.py",
+  "source": "from anthropic import Anthropic\nclient = Anthropic()\n",
+  "expected": "authoritative",
+  "expected_context": "EXAMPLE",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "Anthropic",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

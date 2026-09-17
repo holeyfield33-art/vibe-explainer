@@ -438,7 +438,7 @@ def assess_readiness(
     multiplied together.
     """
     root = discovery.root
-    completeness = COMPLETENESS_AGGREGATED if discovery.truncated else risks.assessment_completeness
+    completeness = risks.assessment_completeness
     root_path = Path(root)
     self_scan = is_self_scan(root_path)
     limitations = list(_STANDARD_LIMITATIONS)

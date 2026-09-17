@@ -1,0 +1,8 @@
+{
+  "id": "py_string_embedded_call",
+  "language": "python",
+  "construct": "string",
+  "path": "app.py",
+  "source": "example = \"client.chat.completions.create(model='gpt-4o')\"\n",
+  "expected": "none"
+}

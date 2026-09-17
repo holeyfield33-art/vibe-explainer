@@ -1,0 +1,8 @@
+{
+  "id": "js_openai_endpoint",
+  "language": "javascript",
+  "construct": "unsupported_language",
+  "path": "app.js",
+  "source": "fetch('https://api.openai.com/v1/chat/completions');\n",
+  "expected": "unsupported"
+}

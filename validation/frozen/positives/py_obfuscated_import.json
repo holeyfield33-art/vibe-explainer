@@ -1,0 +1,17 @@
+{
+  "id": "py_obfuscated_import",
+  "language": "python",
+  "construct": "obfuscation",
+  "path": "hidden.py",
+  "source": "provider = __import__(\"op\" + \"enai\")\n",
+  "expected": "authoritative",
+  "mandatory": false,
+  "known_limitation": true,
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "OpenAI",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

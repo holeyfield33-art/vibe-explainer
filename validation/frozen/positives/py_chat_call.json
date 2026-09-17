@@ -1,0 +1,15 @@
+{
+  "id": "py_chat_call",
+  "language": "python",
+  "construct": "call",
+  "path": "chat.py",
+  "source": "response = client.chat.completions.create(model=\"gpt-4o\", messages=[])\n",
+  "expected": "authoritative",
+  "expected_findings": [
+    {
+      "category": "ai_usage",
+      "name": "Chat/completions call",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}

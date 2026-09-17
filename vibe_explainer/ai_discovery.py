@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from .exclusion_policy import walk_pruned
+from .scan_budget import ACTIVE, within_budget
 from .file_context import classify_file
 from .security_utils import minimal_match_excerpt
 
@@ -475,8 +476,12 @@ def _classify_match_basis(
 def _iter_candidate_files(root_path: Path):
     for dirpath, dirnames, filenames in walk_pruned(root_path):
         for name in filenames:
+            if not within_budget():
+                return
             full = Path(dirpath) / name
             if _scan_suffix(full) not in SCAN_EXTS:
+                if ACTIVE.get():
+                    ACTIVE.get().unsupported.add(_scan_suffix(full) or "(no extension)")
                 continue
             yield full
 
@@ -499,12 +504,17 @@ def _read_text_with_reason(path: Path) -> tuple[str | None, str | None]:
     caller can count *why* a candidate was never examined instead of only knowing
     that it wasn't.
     """
+    budget = ACTIVE.get()
+    if budget and not budget.check():
+        return None, "budget"
     try:
         metadata = path.lstat()
     except OSError:
         return None, "unreadable"
     if not stat.S_ISREG(metadata.st_mode):
         return None, "unreadable"
+    if budget and not budget.admit(path, metadata.st_size):
+        return None, "budget"
     if metadata.st_size > MAX_FILE_BYTES:
         return None, "oversized"
     try:
@@ -524,6 +534,10 @@ def _read_text_with_reason(path: Path) -> tuple[str | None, str | None]:
             os.close(fd)
         if len(data) > MAX_FILE_BYTES:
             return None, "oversized"
+        if budget:
+            if not budget.admit(path, len(data)):
+                return None, "budget"
+            budget.record_read(path, len(data))
         return data.decode("utf-8", errors="ignore"), None
     except OSError:
         return None, "unreadable"
@@ -572,21 +586,25 @@ def discover_ai(
         rel = str(file_path.relative_to(root_path)).replace("\\", "/")
         if rel in excluded:
             continue
-        if result.files_scanned >= MAX_FILES_SCANNED:
+        if not ACTIVE.get() and result.files_scanned >= MAX_FILES_SCANNED:
             result.budget_exhausted = True
             result.budget_exhausted_reason = f"file count budget ({MAX_FILES_SCANNED}) reached"
             break
-        if total_bytes_read >= MAX_TOTAL_BYTES:
+        if not ACTIVE.get() and total_bytes_read >= MAX_TOTAL_BYTES:
             result.budget_exhausted = True
             result.budget_exhausted_reason = f"total byte budget ({MAX_TOTAL_BYTES}) reached"
             break
-        if time.monotonic() - start_time > MAX_SCAN_SECONDS:
+        if not ACTIVE.get() and time.monotonic() - start_time > MAX_SCAN_SECONDS:
             result.budget_exhausted = True
             result.budget_exhausted_reason = f"time budget ({MAX_SCAN_SECONDS}s) reached"
             break
 
         text, skip_reason = _read_text_with_reason(file_path)
         if text is None:
+            if skip_reason == "budget":
+                continue
+            if ACTIVE.get():
+                ACTIVE.get().skipped[rel] = skip_reason or "unreadable"
             if skip_reason == "oversized":
                 result.files_skipped_size += 1
             else:
@@ -600,9 +618,15 @@ def discover_ai(
         file_ctx = classify_file(rel, content=text)
         suffix = _scan_suffix(file_path)
         syntax = _python_syntax(text) if suffix == ".py" else None
+        if syntax and not syntax.parsed and ACTIVE.get():
+            ACTIVE.get().parse_failures.add(rel)
 
         for category, name, pattern, confidence in _PATTERNS:
+            if not within_budget():
+                break
             for match in pattern.finditer(text):
+                if not within_budget():
+                    break
                 classified = _classify_match_basis(suffix, syntax, text, match.start(), name)
                 if classified is None:
                     continue
@@ -689,7 +713,10 @@ def discover_ai(
                 )
 
     # Phase 8G: resolve repo-internal imports once, for cross-file dataflow.
-    result.imports_by_file = _resolve_internal_imports(file_texts)
+    result.imports_by_file = _resolve_internal_imports(file_texts) if within_budget() else {}
+    if ACTIVE.get() and ACTIVE.get().reason:
+        result.budget_exhausted = True
+        result.budget_exhausted_reason = ACTIVE.get().reason
 
     return result
 

@@ -1,0 +1,8 @@
+{
+  "id": "py_tool_decorator",
+  "language": "python",
+  "construct": "decorator",
+  "path": "tools.py",
+  "source": "@tool\ndef lookup(query: str):\n    return query\n",
+  "expected": "unresolved"
+}

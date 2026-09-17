@@ -1,0 +1,16 @@
+{
+  "id": "test_context",
+  "language": "python",
+  "construct": "test_context",
+  "path": "tests/test_client.py",
+  "source": "from openai import OpenAI\n",
+  "expected": "authoritative",
+  "expected_context": "TEST",
+  "expected_findings": [
+    {
+      "category": "model_provider",
+      "name": "OpenAI",
+      "evidence_basis": "PYTHON_AST"
+    }
+  ]
+}
