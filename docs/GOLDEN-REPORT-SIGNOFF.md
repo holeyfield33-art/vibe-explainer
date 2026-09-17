@@ -28,6 +28,9 @@ Reviewer: pending
 Review date: pending
 Approved output SHA-256: pending
 
+The approved output hash is SHA-256 of UTF-8 text with LF line endings, matching
+the renderer and qualification check; it must not depend on Git checkout settings.
+
 No analyst signature has been supplied; implementation authors do not self-sign
 this gate. The frozen candidate is a regression artifact, **not an approved client
 deliverable**. Approval requires a named reviewer, date, exact hashes and completed

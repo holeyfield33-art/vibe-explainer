@@ -12,7 +12,8 @@ Recorded before implementation, 2026-09-17.
   build subprocess exit 1 while qualification was building in the same checkout.
   No code changed: standalone sdist/wheel build succeeded; isolated test retry
   passed (1 passed). Qualification's full suite and coverage suite also passed.
-  Treat the initial failure as build contention, not a demonstrated product defect.
+  Concurrent-build contention is suspected, not proven: the captured assertion did
+  not expose build stderr. No repeatable packaging defect was established.
   Subsequent builds/tests must be serialized.
 - Product-boundary check: pass.
 - Corpus metric and exact-label gates: pass; known obfuscated-import false negative.

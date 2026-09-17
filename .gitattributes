@@ -1,0 +1,2 @@
+# This fixture has a deliberately pinned raw-byte provenance hash.
+tests/fixtures/asi-catalog-40.json text eol=lf
