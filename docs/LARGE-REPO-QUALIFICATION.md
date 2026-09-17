@@ -19,6 +19,22 @@ Each prefix has `.json` and `.md` files. The full machine-readable run record is
 their artifacts and exact counts under the requested output directory's
 `large-repos/`; timing-dependent scope is not expected to equal this table.
 
+## Final clean-environment run
+
+Engine commit `79a25f13313c0b5bf44196ebdf096a1fa9706b95`, same upstream SHAs as above.
+All three qualifications passed; all six JSON/Markdown scan processes exited 0.
+Every JSON report recorded `PARTIAL` and `time budget (2.0s) reached`; no errors.
+
+| Repository | Discovered | Inspected | Analysis / process seconds | AI items | Surface leads | Control observations | Artifact prefix |
+|---|---:|---:|---|---:|---:|---:|---|
+| openai/openai-python | 170 | 87 | 2.047359 / 2.940 | 210 | 210 | 16 | `dist/beta-qualification-verified/large-repos/openai-python` |
+| langchain-ai/langgraph | 135 | 71 | 2.015385 / 2.572 | 23 | 23 | 0 | `dist/beta-qualification-verified/large-repos/langgraph` |
+| BerriAI/litellm | 111 | 54 | 2.025829 / 3.225 | 51 | 51 | 7 | `dist/beta-qualification-verified/large-repos/litellm` |
+
+These artifacts and `qualification.json` survive cleanup of the isolated checkout.
+Counts differ from the first run because a time cutoff depends on machine load.
+No detector rule or upstream content was changed to obtain these results.
+
 ```powershell
 python scripts/qualify_large_repos.py --targets "$env:TEMP/vibe-beta-targets" --output "$env:TEMP/vibe-beta-large" --max-seconds 2
 ```
