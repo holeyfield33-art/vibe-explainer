@@ -44,3 +44,37 @@ def atomic_write_text(path: str | Path, content: str, *, overwrite: bool = False
                 os.unlink(temp_name)
             except FileNotFoundError:
                 pass
+
+
+def atomic_write_bytes(path: str | Path, content: bytes, *, overwrite: bool = False) -> None:
+    """Atomically publish binary artifacts with the same no-overwrite rule."""
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_name: str | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=destination.parent,
+            prefix=f".{destination.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temp_name = handle.name
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        if overwrite:
+            os.replace(temp_name, destination)
+            temp_name = None
+        else:
+            try:
+                os.link(temp_name, destination)
+            except FileExistsError as exc:
+                raise OutputExistsError(
+                    f"output already exists: {destination}; pass --force to replace it"
+                ) from exc
+            os.unlink(temp_name)
+            temp_name = None
+    finally:
+        if temp_name is not None:
+            try:
+                os.unlink(temp_name)
+            except FileNotFoundError:
+                pass

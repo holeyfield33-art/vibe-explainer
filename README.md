@@ -32,6 +32,9 @@ vibe-explainer /path/to/repo --json
 # Detailed Markdown for analyst review
 vibe-explainer /path/to/repo --report -o review.md
 
+# Paired, unsigned JSON/Markdown candidate with hashes and review checklist
+vibe-explainer /path/to/repo --review-packet private-review.zip
+
 # Research compatibility only: include uncalibrated legacy scoring
 vibe-explainer /path/to/repo --json --experimental-scoring
 
@@ -42,6 +45,8 @@ vibe-explainer /path/to/repo --json \
 
 Output files are created atomically and are never replaced implicitly. Use `--force`
 only when replacing the named destination is intentional.
+Review packets remain unsigned candidates. Verify their hashes and complete the
+[Phase 2 analyst workflow](docs/PHASE-2-PRODUCTION-REPORT.md) before any customer use.
 
 `--security` and `--consultant` remain accepted as deprecated compatibility aliases.
 The original repository-orientation report is available only through

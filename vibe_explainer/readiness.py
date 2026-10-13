@@ -112,6 +112,10 @@ def _iter_all_repo_paths(root_path: Path, excluded_paths: frozenset[str] = froze
     shared bounded reader performs a second no-follow check before content reads.
     """
     for dirpath, dirnames, filenames in walk_pruned(root_path):
+        # A nested checkout has its own security process. Its tests and CI are
+        # not evidence about the assessed repository's process.
+        dirnames[:] = [name for name in dirnames
+                       if not (Path(dirpath) / name / ".git").exists()]
         for name in filenames:
             path = Path(dirpath) / name
             rel = str(path.relative_to(root_path)).replace("\\", "/")

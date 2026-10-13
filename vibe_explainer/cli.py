@@ -11,7 +11,7 @@ from pathlib import Path
 
 from . import __version__
 from .integrate_vibe_check import load_vibe_check_report, summarize_vibe_findings
-from .output import OutputExistsError, atomic_write_text
+from .output import OutputExistsError, atomic_write_bytes, atomic_write_text
 from .report import render_markdown
 from .scanner import scan_repo
 from .scan_budget import ACTIVE, ScanBudget
@@ -114,6 +114,11 @@ def build_parser() -> argparse.ArgumentParser:
         dest="detailed_report",
         action="store_true",
         help="Emit detailed Markdown for analyst review. --consultant is a deprecated alias.",
+    )
+    p.add_argument(
+        "--review-packet",
+        metavar="PATH.zip",
+        help="Create one unsigned analyst-review ZIP with paired JSON, Markdown, hashes and checklist.",
     )
     p.add_argument(
         "--asi-catalog",
@@ -232,6 +237,7 @@ def _run_security_mode(
     max_files: int = 20_000,
     max_bytes: int = 200_000_000,
     max_seconds: float = 120.0,
+    review_packet: str | None = None,
 ) -> int:
     from .ai_discovery import discover_ai
     from .attack_surface import build_attack_surface
@@ -246,9 +252,9 @@ def _run_security_mode(
     token = ACTIVE.set(budget)
     try:
         excluded_paths: set[str] = set()
-        if out:
+        if out or review_packet:
             try:
-                output_rel = Path(out).resolve().relative_to(repo.resolve())
+                output_rel = Path(out or review_packet).resolve().relative_to(repo.resolve())
                 excluded_paths.add(str(output_rel).replace("\\", "/"))
             except ValueError:
                 pass
@@ -318,6 +324,32 @@ def _run_security_mode(
     finally:
         ACTIVE.reset(token)
 
+    if review_packet:
+        from .review_packet import build_review_packet
+
+        payload = report.to_dict()
+        # A customer packet needs repository identity and commit, not the
+        # analyst workstation's absolute checkout path.
+        payload["metadata"].pop("repository_path", None)
+        if asi_matrix is not None:
+            payload["asi_matrix"] = asi_matrix
+        evidence_json = json.dumps(redact_structure(payload), indent=2, sort_keys=False, ensure_ascii=False)
+        review_md = render_consultant_markdown(report)
+        if asi_matrix is not None:
+            review_md += _asi_markdown(asi_matrix)
+        review_md = redact_secrets(review_md)
+        try:
+            packet = build_review_packet(report, evidence_json=evidence_json, review_markdown=review_md)
+            atomic_write_bytes(review_packet, packet, overwrite=force)
+        except OutputExistsError as exc:
+            print(redact_secrets(f"Unable to write review packet: {exc}"), file=sys.stderr)
+            return 2
+        except (OSError, ValueError) as exc:
+            print(redact_secrets(f"Unable to write review packet: {exc}"), file=sys.stderr)
+            return 1
+        print(redact_secrets(f"Wrote unsigned review packet {review_packet}"), file=sys.stderr)
+        return 0
+
     if as_json:
         payload = report.to_dict()
         if asi_matrix is not None:
@@ -364,6 +396,13 @@ def main(argv: list[str] | None = None) -> int:
         print("error: --vibe-check-report requires --legacy-mental-model", file=sys.stderr)
         return 2
 
+    if args.review_packet and (args.json or args.detailed_report or args.out or args.experimental_scoring or args.legacy_mental_model):
+        print("error: --review-packet cannot be combined with --json, --report, --out, --experimental-scoring or --legacy-mental-model", file=sys.stderr)
+        return 2
+    if args.review_packet and Path(args.review_packet).suffix.lower() != ".zip":
+        print("error: --review-packet output must have a .zip extension", file=sys.stderr)
+        return 2
+
     if not args.legacy_mental_model:
         return _run_security_mode(
             repo,
@@ -376,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
             args.max_files,
             args.max_bytes,
             args.max_seconds,
+            args.review_packet,
         )
 
     if args.json or args.detailed_report or args.asi_catalog or args.experimental_scoring:
