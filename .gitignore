@@ -22,3 +22,7 @@ EXPLAIN.md
 !validation/frozen/
 !validation/frozen/**/*.json
 .DS_Store
+
+# Guard: never commit dumped sites or controller state into this repo
+sites/
+controller_state/

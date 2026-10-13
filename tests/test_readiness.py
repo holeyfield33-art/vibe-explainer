@@ -261,6 +261,17 @@ class TestFalsePositiveProtection(unittest.TestCase):
             self.assertTrue(is_self_scan(root))
             self.assertEqual(_scan_process_signals(root).security_test_artifact, [])
 
+    def test_nested_checkout_does_not_supply_process_evidence(self):
+        with tempfile.TemporaryDirectory() as root_dir:
+            root = Path(root_dir)
+            nested = root / "controller_state" / "nested-checkout"
+            (nested / ".git").mkdir(parents=True)
+            test = nested / "tests" / "security" / "test_auth.py"
+            test.parent.mkdir(parents=True)
+            test.write_text("def test_auth():\n    assert 1 + 1 == 2\n")
+            signals = _scan_process_signals(root)
+            self.assertEqual(signals.security_test_artifact, [])
+
 
 class TestTruncatedDiscovery(unittest.TestCase):
     def test_completeness_aggregated_when_discovery_truncated(self):
